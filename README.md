@@ -1,5 +1,9 @@
 # Home Assistant Holiday Porch Lights
 
+![Porch Theme](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcr_lights.melson.us%2Fcr_light_stats.php&query=%24%5B%27input_text.porch_theme%27%5D&label=Porch%20Theme&color=orange)
+
+*The badge shows the theme my porch is running tonight (it holds last night's theme during the day).*
+
 ## What this is
 
 A how-to for holiday-themed porch lights in Home Assistant. Every evening at dusk the porch lights come on in the colours of the nearest holiday, or in your team's colours on a game day, or plain warm white on an ordinary night. They switch off at 23:59.
