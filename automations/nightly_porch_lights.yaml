@@ -22,10 +22,5 @@ actions:
       entity_id:
         - light.porch_left
         - light.porch_right
-  # Optional: publish "Off" so a live badge does not show a stale theme.
-  # Remove this step if you skip the porch_theme helper.
-  - action: input_text.set_value
-    target:
-      entity_id: input_text.porch_theme
-    data:
-      value: "Off"
+  # The porch_theme helper keeps tonight's theme until the next run, so a
+  # badge still reads "last night's theme" during the day rather than "Off".

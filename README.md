@@ -65,7 +65,7 @@ One more shape to know: `calendar.get_events` returns `start` as a plain ISO str
 
 ## Publish live values (optional)
 
-The script writes the theme name (for example `Halloween`, `Game day`, `Default white`, or `Off` after 23:59) to `input_text.porch_theme`. That makes it publishable as a live badge, the same way the circadian-lights how-to publishes its sensors: see "Publish live values" in [HA_circadian_lights](https://github.com/mels0n/HA_circadian_lights) for the small read-only proxy. Add `input_text.porch_theme` to the proxy's `$entities` allow-list, then point a shields.io [dynamic JSON badge](https://shields.io/badges/dynamic-json-badge) at it with a query like `$['input_text.porch_theme']`.
+The script writes the theme name (for example `Halloween`, `Game day`, or `Default white`) to `input_text.porch_theme`, and it keeps that value until the next evening. That makes it publishable as a live badge, the same way the circadian-lights how-to publishes its sensors: see "Publish live values" in [HA_circadian_lights](https://github.com/mels0n/HA_circadian_lights) for the small read-only proxy. Add `input_text.porch_theme` to the proxy's `$entities` allow-list, then point a shields.io [dynamic JSON badge](https://shields.io/badges/dynamic-json-badge) at it with a query like `$['input_text.porch_theme']`.
 
 The proxy only ever reads the entity ids on its allow-list and only returns their `state`, so a caller cannot use it to read anything else.
 
