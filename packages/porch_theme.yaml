@@ -1,0 +1,10 @@
+# Holds the display name of tonight's porch theme, so it can be shown on a
+# dashboard or published as a badge. Optional: the lights work without it, but
+# remove the input_text.set_value steps from the script and automation if you
+# skip this file.
+input_text:
+  porch_theme:
+    name: Porch theme
+    icon: mdi:string-lights
+    max: 100
+    # No initial: value, so the last theme survives a restart.
