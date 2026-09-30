@@ -17,7 +17,7 @@ This is a cleaned-up, generic version of the setup running on my own porch, not 
 
 | File | Purpose |
 |---|---|
-| `automations/nightly_porch_lights.yaml` | Sunset minus 30 minutes: run the script, wait for 23:59, turn the lights off |
+| `automations/nightly_porch_lights.yaml` | The schedule: run the script 30 minutes before sunset, turn the lights off at 23:59, and re-apply after a restart during the evening |
 | `scripts/porch_lights_with_holiday.yaml` | The rules table, the calendar lookups, and the look selection |
 | `scenes/porch_scenes.yaml` | Example scenes for eight looks (seven holidays and a game day) |
 | `packages/porch_theme.yaml` | Optional `input_text.porch_theme` helper |
@@ -46,7 +46,7 @@ The default look uses `light.turn_on` with `color_temp_kelvin: 2700`, so it work
    homeassistant:
      packages: !include_dir_named packages
    ```
-   Copy `packages/porch_theme.yaml` to `/config/packages/` and restart. Or create a Text helper named `porch_theme` in the UI (Settings > Devices & services > Helpers) with a maximum length of 100. If you skip it, delete the `input_text.set_value` step at the end of the script and at the end of the automation.
+   Copy `packages/porch_theme.yaml` to `/config/packages/` and restart. Or create a Text helper named `porch_theme` in the UI (Settings > Devices & services > Helpers) with a maximum length of 100. If you skip it, delete the `input_text.set_value` step at the end of the script.
 5. **Script.** Settings > Automations & scenes > Scripts > Add script > three-dot menu > Edit in YAML. Paste `scripts/porch_lights_with_holiday.yaml`, adjust the entities, save. Its entity id becomes `script.porch_lights_with_holiday`, which the automation calls.
 6. **Automation.** Settings > Automations & scenes > Create automation > three-dot menu > Edit in YAML. Paste `automations/nightly_porch_lights.yaml`, save.
 7. **Try it.** Run the script from the UI. Check Settings > Automations & scenes > Scripts > this script > Traces to see which branch it took.
@@ -61,7 +61,7 @@ The default look uses `light.turn_on` with `color_temp_kelvin: 2700`, so it work
 
 One more shape to know: `calendar.get_events` returns `start` as a plain ISO string (`"2026-09-07"` for an all-day event), not a dict. The script reads the first ten characters and does date-only maths, which avoids the naive-versus-aware datetime error you get from comparing an all-day event with `now()`.
 
-**Tuning.** Lead days, colours and display names live in `rules` and the scenes. The start (30 minutes before sunset) and end (23:59) times live in the automation. To end the evening at a different time, change the `time` trigger inside `wait_for_trigger`.
+**Tuning.** Lead days, colours and display names live in `rules` and the scenes. The start (30 minutes before sunset) and end (23:59) times live in the automation. To end the evening at a different time, change the `time` trigger (and the matching `before:` in the restart branch).
 
 ## Publish live values (optional)
 

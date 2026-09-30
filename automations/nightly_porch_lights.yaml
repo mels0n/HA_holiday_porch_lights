@@ -9,18 +9,50 @@ triggers:
   - trigger: sun
     event: sunset
     offset: "-00:30:00"
-actions:
-  - action: script.porch_lights_with_holiday
-  - wait_for_trigger:
-      - trigger: time
-        at: "23:59:00"
+    id: lights_on
+  - trigger: time
+    at: "23:59:00"
+    id: lights_off
     note: >-
-      A fixed clock time rather than a duration, so the lights always end by
-      midnight whatever time sunset was.
-  - action: light.turn_off
-    target:
-      entity_id:
-        - light.porch_left
-        - light.porch_right
-  # The porch_theme helper keeps tonight's theme until the next run, so a
-  # badge still reads "last night's theme" during the day rather than "Off".
+      Its own trigger, not a wait inside the sunset run. A wait is lost if Home
+      Assistant restarts during the evening (or the script errors), which
+      leaves the porch on all night. A fixed clock time, so the lights always
+      end by midnight whatever time sunset was.
+  - trigger: homeassistant
+    event: start
+    id: ha_start
+    note: >-
+      Catches a restart during the evening: without it, a Home Assistant that
+      was down at sunset leaves the porch dark for the night.
+actions:
+  - choose:
+      - alias: Sunset, turn on with tonight's theme
+        conditions:
+          - condition: trigger
+            id: lights_on
+        sequence:
+          - action: script.porch_lights_with_holiday
+      - alias: 23:59, turn off
+        conditions:
+          - condition: trigger
+            id: lights_off
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id:
+                - light.porch_left
+                - light.porch_right
+          # The porch_theme helper keeps tonight's theme until the next run, so
+          # a badge still reads "last night's theme" during the day rather than
+          # "Off".
+      - alias: Started during the evening, re-apply tonight's lights
+        conditions:
+          - condition: trigger
+            id: ha_start
+          - condition: sun
+            after: sunset
+            after_offset: "-00:30:00"
+          - condition: time
+            before: "23:59:00"
+        sequence:
+          - action: script.porch_lights_with_holiday
