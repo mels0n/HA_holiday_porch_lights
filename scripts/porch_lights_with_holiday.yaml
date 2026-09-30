@@ -1,0 +1,106 @@
+alias: Porch lights with holiday
+description: >-
+  Turns the porch lights on with the right look. Precedence: holiday scene,
+  then game-day scene, then plain white. The rules table under variables is the
+  single place to add or change a holiday.
+icon: mdi:string-lights
+mode: single
+variables:
+  # [summary substring, scene, lead days, display name]
+  #   substring    matched with `in` against the calendar event summary
+  #   lead days    0 = day of only; 25 = starts 25 days before the holiday
+  # The first row that matches an upcoming event wins, so put the holidays
+  # with a lead-up window first.
+  rules:
+    - ["Christmas Day", scene.porch_christmas, 25, "Christmas"]
+    - ["Halloween", scene.porch_halloween, 15, "Halloween"]
+    - ["Thanksgiving Day", scene.porch_thanksgiving, 10, "Thanksgiving"]
+    - ["New Year's Day", scene.porch_patriotic, 4, "New Year"]
+    - ["Independence Day", scene.porch_patriotic, 4, "Fourth of July"]
+    - ["Memorial Day", scene.porch_patriotic, 0, "Memorial Day"]
+    - ["Juneteenth", scene.porch_patriotic, 0, "Juneteenth"]
+    - ["Labor Day", scene.porch_patriotic, 0, "Labor Day"]
+    - ["Washington", scene.porch_patriotic, 0, "Presidents Day"]
+    - ["King", scene.porch_mlk_day, 0, "MLK Day"]
+    - ["Valentine", scene.porch_valentines_day, 0, "Valentine's Day"]
+    - ["Patrick", scene.porch_st_patricks_day, 0, "St. Patrick's Day"]
+sequence:
+  # Holiday calendar. Core calendars have no `events` attribute, so the events
+  # must be fetched with this action. The window is explicit and anchored to
+  # the start of today (see the README for why not `duration:`). 25 days is the
+  # longest lead in the rules table.
+  - action: calendar.get_events
+    continue_on_error: true
+    target:
+      entity_id: calendar.holidays
+    data:
+      start_date_time: "{{ today_at('00:00') }}"
+      end_date_time: "{{ today_at('00:00') + timedelta(days=25) }}"
+    response_variable: holiday_events
+  # Your team's schedule calendar: any event today means game day.
+  - action: calendar.get_events
+    continue_on_error: true
+    target:
+      entity_id: calendar.team_schedule
+    data:
+      start_date_time: "{{ today_at('00:00') }}"
+      end_date_time: "{{ today_at('00:00') + timedelta(days=1) }}"
+    response_variable: game_events
+  - variables:
+      # Index of the winning row in `rules`, or -1 when nothing applies.
+      # The `is defined` guards keep a briefly unavailable calendar from
+      # stopping the script: it falls through to the next branch instead.
+      rule_index: >-
+        {%- set events = holiday_events.get('calendar.holidays', {}).get('events', []) if holiday_events is defined else [] -%}
+        {%- set today = now().date() -%}
+        {%- set pick = namespace(i=-1) -%}
+        {%- for r in rules -%}
+        {%- set idx = loop.index0 -%}
+        {%- for e in events -%}
+        {%- if pick.i < 0 and r[0] in e.summary -%}
+        {%- set delta = (strptime(e.start[:10], '%Y-%m-%d').date() - today).days -%}
+        {%- if delta >= 0 and delta <= r[2] -%}{%- set pick.i = idx -%}{%- endif -%}
+        {%- endif -%}
+        {%- endfor -%}
+        {%- endfor -%}
+        {{- pick.i -}}
+      is_game_day: >-
+        {{ ((game_events.get('calendar.team_schedule', {}).get('events', []) | count) > 0)
+           if game_events is defined else false }}
+  - variables:
+      # What to show on a badge or dashboard.
+      theme_name: >-
+        {%- if rule_index | int(-1) >= 0 -%}{{ rules[rule_index | int][3] }}
+        {%- elif is_game_day -%}Game day
+        {%- else -%}Default white{%- endif -%}
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ rule_index | int(-1) >= 0 }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ rules[rule_index | int][1] }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ is_game_day }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: scene.porch_game_day
+    default:
+      - action: light.turn_on
+        target:
+          entity_id:
+            - light.porch_left
+            - light.porch_right
+        data:
+          color_temp_kelvin: 2700
+          brightness: 255
+  # Optional: record the theme for a dashboard or badge. Remove this step if
+  # you skip packages/porch_theme.yaml.
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.porch_theme
+    data:
+      value: "{{ theme_name }}"

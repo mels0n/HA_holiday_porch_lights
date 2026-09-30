@@ -1,0 +1,31 @@
+alias: Nightly porch lights
+description: >-
+  Runs the porch lights from 30 minutes before sunset until 23:59. The script
+  script.porch_lights_with_holiday picks the look (holiday scene, game-day
+  scene, or plain white). This automation is only the schedule; to change what
+  the lights do, edit the script.
+mode: single
+triggers:
+  - trigger: sun
+    event: sunset
+    offset: "-00:30:00"
+actions:
+  - action: script.porch_lights_with_holiday
+  - wait_for_trigger:
+      - trigger: time
+        at: "23:59:00"
+    note: >-
+      A fixed clock time rather than a duration, so the lights always end by
+      midnight whatever time sunset was.
+  - action: light.turn_off
+    target:
+      entity_id:
+        - light.porch_left
+        - light.porch_right
+  # Optional: publish "Off" so a live badge does not show a stale theme.
+  # Remove this step if you skip the porch_theme helper.
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.porch_theme
+    data:
+      value: "Off"

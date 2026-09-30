@@ -1,0 +1,118 @@
+# Example scenes, in the format of scenes.yaml. Each assumes a two-bulb porch:
+# a left bulb and a right bulb, one colour each. Recolour them in the scene
+# editor (Settings > Automations & scenes > Scenes) after importing.
+# hs_color is [hue 0-360, saturation 0-100]; brightness is 0-255.
+- id: porch_christmas
+  name: Porch Christmas
+  icon: mdi:pine-tree
+  entities:
+    light.porch_left:
+      state: "on"
+      color_mode: hs
+      hs_color: [0, 100]
+      brightness: 255
+    light.porch_right:
+      state: "on"
+      color_mode: hs
+      hs_color: [120, 100]
+      brightness: 255
+- id: porch_halloween
+  name: Porch Halloween
+  icon: mdi:halloween
+  entities:
+    light.porch_left:
+      state: "on"
+      color_mode: hs
+      hs_color: [30, 100]
+      brightness: 255
+    light.porch_right:
+      state: "on"
+      color_mode: hs
+      hs_color: [256, 66]
+      brightness: 255
+- id: porch_thanksgiving
+  name: Porch Thanksgiving
+  icon: mdi:turkey
+  entities:
+    light.porch_left:
+      state: "on"
+      color_mode: hs
+      hs_color: [30, 100]
+      brightness: 255
+    light.porch_right:
+      state: "on"
+      color_mode: hs
+      hs_color: [0, 100]
+      brightness: 255
+- id: porch_patriotic
+  name: Porch Patriotic
+  icon: mdi:firework
+  entities:
+    light.porch_left:
+      state: "on"
+      color_mode: hs
+      hs_color: [0, 100]
+      brightness: 252
+    light.porch_right:
+      state: "on"
+      color_mode: hs
+      hs_color: [240, 100]
+      brightness: 252
+- id: porch_valentines_day
+  name: Porch Valentine's Day
+  icon: mdi:cards-heart-outline
+  entities:
+    light.porch_left:
+      state: "on"
+      color_mode: hs
+      hs_color: [305, 97]
+      brightness: 255
+    light.porch_right:
+      state: "on"
+      color_mode: hs
+      hs_color: [303, 100]
+      brightness: 255
+- id: porch_st_patricks_day
+  name: Porch St. Patrick's Day
+  icon: mdi:clover
+  entities:
+    light.porch_left:
+      state: "on"
+      color_mode: hs
+      hs_color: [120, 100]
+      brightness: 255
+    light.porch_right:
+      state: "on"
+      color_mode: hs
+      hs_color: [50, 100]
+      brightness: 255
+- id: porch_mlk_day
+  name: Porch MLK Day
+  icon: mdi:chess-king
+  entities:
+    light.porch_left:
+      state: "on"
+      color_mode: hs
+      hs_color: [255, 100]
+      brightness: 252
+    light.porch_right:
+      state: "on"
+      color_mode: hs
+      hs_color: [119, 98]
+      brightness: 252
+# Game day: navy on the left at about half brightness (true navy is very dark
+# on a bulb) and a deep red on the right. Swap in your team's colours.
+- id: porch_game_day
+  name: Porch Game Day
+  icon: mdi:soccer
+  entities:
+    light.porch_left:
+      state: "on"
+      color_mode: hs
+      hs_color: [220, 100]
+      brightness: 128
+    light.porch_right:
+      state: "on"
+      color_mode: hs
+      hs_color: [348, 92]
+      brightness: 252
