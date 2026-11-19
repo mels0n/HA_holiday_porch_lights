@@ -1,0 +1,169 @@
+# Helpers for the outdoor holiday lights. Drop this file in /config/packages/ and restart.
+# Everything the scripts, automations and dashboard view read lives here.
+
+# The one list of lights. Scripts read its members at run time and sort them by capability
+# (LIFX strand, colour bulb, white-only), so adding a light means adding it here and nothing else.
+# Replace the entity ids with your own, or build the same group in the UI instead
+# (Settings > Devices & services > Helpers > Group > Light group) and delete this block.
+light:
+  - platform: group
+    name: Outdoor lights
+    unique_id: outdoor_lights
+    entities:
+      - light.porch_strand
+      - light.porch_left
+      - light.porch_right
+      - light.back_porch
+
+input_text:
+  outdoor_theme_key:
+    name: Outdoor theme key
+    icon: mdi:key-variant
+    max: 100
+    # Machine key of the theme in use (christmas, team, paint_custom, white, ...).
+    # initial: "" so it clears on a restart and the scripts re-pick it.
+    initial: ""
+  porch_theme:
+    name: Porch theme
+    icon: mdi:string-lights
+    max: 100
+    # Display name of tonight's theme. No initial: value, so the last theme survives a restart.
+    # Optional to publish as a badge (see README).
+
+input_select:
+  outdoor_theme_override:
+    name: Outdoor theme override
+    icon: mdi:palette
+    # Auto lets the calendars decide. Anything else wins until 23:59, when the nightly automation
+    # sets it back to Auto. The option names are matched by script.outdoor_resolve_theme.
+    # initial: Auto so a restart also drops a manual pick. The helpers below have no initial:
+    # value, so they keep their last setting across a restart.
+    options:
+      - Auto
+      - "Paint: LIFX theme"
+      - "Paint: my colours"
+      - Christmas
+      - Halloween
+      - Thanksgiving
+      - New Year
+      - Fourth of July
+      - USA
+      - Memorial Day
+      - MLK Day
+      - Valentine's Day
+      - St. Patrick's Day
+      - Game day
+      - Club team
+      - White
+  outdoor_paint_theme:
+    name: Outdoor paint theme
+    icon: mdi:palette-swatch
+    # A curated slice of the LIFX themes. The strand's own Theme select lists all of them; any name
+    # from that list works here if you add it. Before you first choose one it sits on the first option.
+    options:
+      - autumn
+      - be_my_valentine
+      - bias_lighting
+      - blissful
+      - calaveras
+      - candy_cane
+      - cheerful
+      - christmas
+      - dream
+      - energizing
+      - epic
+      - evening
+      - exciting
+      - fantasy
+      - fireworks_finale
+      - focusing
+      - gentle
+      - halloween
+      - hanukkah
+      - holly
+      - hygge
+      - independence
+      - intense
+      - kwanzaa
+      - love
+      - mellow
+      - memorial_day
+      - old_glory
+      - party
+      - peaceful
+      - powerful
+      - pumpkin
+      - relaxing
+      - romance
+      - santa
+      - serene
+      - shamrock
+      - soothing
+      - spring
+      - st_patricks_day
+      - stardust
+      - thanksgiving
+      - usa
+      - warming
+
+input_number:
+  # Hues for Paint my colours (0 to 360). Saturation is always 100. A new helper starts at 0, so set
+  # the three sliders and the speed once after installing.
+  outdoor_paint_colour_1:
+    name: Paint colour 1
+    icon: mdi:palette
+    min: 0
+    max: 360
+    step: 1
+    mode: slider
+  outdoor_paint_colour_2:
+    name: Paint colour 2
+    icon: mdi:palette
+    min: 0
+    max: 360
+    step: 1
+    mode: slider
+  outdoor_paint_colour_3:
+    name: Paint colour 3
+    icon: mdi:palette
+    min: 0
+    max: 360
+    step: 1
+    mode: slider
+  # Seconds for a pattern to cross the whole strand. 0 = still, 60 is the LIFX maximum.
+  outdoor_paint_speed:
+    name: Paint speed
+    icon: mdi:speedometer
+    min: 0
+    max: 60
+    step: 1
+    mode: slider
+    unit_of_measurement: s
+  # Optional, for the live match automation: seconds to wait before a goal show (broadcast lag).
+  goal_delay:
+    name: Goal delay
+    icon: mdi:timer-sand
+    min: 0
+    max: 120
+    step: 1
+    mode: slider
+    unit_of_measurement: s
+
+input_boolean:
+  # Optional, for the live match automation. On while a match is live.
+  match_window:
+    name: Match window
+    icon: mdi:soccer
+
+template:
+  - sensor:
+      # Count of the group members that are currently available. The members attribute holds the list;
+      # the reconnect automation compares the old and new list to see which light just came back.
+      - name: Outdoor lights available
+        unique_id: outdoor_lights_available
+        icon: mdi:lightbulb-group
+        state: >-
+          {{ (state_attr('light.outdoor_lights', 'entity_id') or []) | select('has_value') | list | length }}
+        attributes:
+          members: >-
+            {{ (state_attr('light.outdoor_lights', 'entity_id') or []) | select('has_value') | list }}

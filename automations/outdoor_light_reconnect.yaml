@@ -1,0 +1,60 @@
+# Automation. Settings > Automations & scenes > Create automation > three-dot menu > Edit in YAML.
+alias: Outdoor light reconnect
+description: When a member of light.outdoor_lights becomes available again (tracked by the members attribute
+  of sensor.outdoor_lights_available), applies the active outdoor theme to just that light between sunset-30
+  and 23:59, or while a manual theme is picked. Outside the evening window, with the override on Auto,
+  a light that comes back after a power blip is turned off instead, because many lights power on by themselves.
+  The window is checked again after a 3 second settling delay. If you also run automations that restore
+  lights when they reconnect, make them skip members of light.outdoor_lights so they do not fight this one.
+triggers:
+- trigger: state
+  entity_id: sensor.outdoor_lights_available
+  attribute: members
+  id: availability_changed
+conditions:
+- condition: template
+  value_template: '{{ trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state
+    not in [''unknown'', ''unavailable''] and trigger.to_state.state not in [''unknown'', ''unavailable'']
+    }}'
+  note: Skip the sensor's own startup and reload.
+actions:
+- variables:
+    newly_available: '{{ (trigger.to_state.attributes.members | default([], true)) | reject(''in'', (trigger.from_state.attributes.members
+      | default([], true))) | list }}'
+- condition: template
+  value_template: '{{ newly_available | length > 0 }}'
+- delay:
+    seconds: 3
+- choose:
+  - alias: Evening window, or a manual theme is picked - apply the theme to the light that came back
+    conditions:
+    - condition: or
+      conditions:
+      - condition: and
+        conditions:
+        - condition: sun
+          after: sunset
+          after_offset: -00:30:00
+        - condition: time
+          before: '23:59:00'
+      - condition: not
+        conditions:
+        - condition: state
+          entity_id: input_select.outdoor_theme_override
+          state: Auto
+    sequence:
+    - repeat:
+        for_each: '{{ newly_available }}'
+        sequence:
+        - action: script.outdoor_apply_theme
+          data:
+            target: '{{ repeat.item }}'
+          continue_on_error: true
+  default:
+  - action: light.turn_off
+    target:
+      entity_id: '{{ newly_available }}'
+    continue_on_error: true
+    note: Outside the window with the override on Auto the lights should be off.
+mode: queued
+max: 5

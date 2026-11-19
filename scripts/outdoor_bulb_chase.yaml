@@ -1,0 +1,86 @@
+# Script. Settings > Automations & scenes > Scripts > Add script > three-dot menu > Edit in YAML.
+# Save it as script.outdoor_bulb_chase (the entity id comes from the name).
+alias: Outdoor Bulb Chase
+icon: mdi:led-strip-variant
+mode: restart
+description: Rotates a list of colours across the colour-capable members of light.outdoor_lights (group
+  order, strand excluded), advancing one step every interval. Runs while input_text.outdoor_theme_key
+  still holds the value it had at start and light.outdoor_lights is on. Stopped with script.turn_off or
+  by a restart. Colour changes are instant (transition 0). With a LIFX theme name it repaints the LIFX
+  bulbs from that theme each step instead; other brands of colour bulb keep rotating the colour list. LIFX themes carry their own brightness per colour, so theme-driven
+  bulbs vary in brightness by design.
+fields:
+  colors:
+    name: Colors
+    description: List of [hue, saturation] pairs.
+    required: true
+    example: '[[0,100],[120,100]]'
+    selector:
+      object: {}
+  interval:
+    name: Interval
+    description: Seconds between steps.
+    required: true
+    default: 20
+    selector:
+      number:
+        min: 2
+        max: 600
+        unit_of_measurement: s
+  theme:
+    name: LIFX theme
+    description: Optional LIFX theme name. When set, each step repaints the bulbs with lifx.paint_theme
+      (colours drawn from that theme) instead of rotating colors.
+    required: false
+    selector:
+      text: {}
+sequence:
+- variables:
+    key0: '{{ states(''input_text.outdoor_theme_key'') }}'
+    step_s: '{{ interval | float(20) }}'
+    palette: '{{ colors }}'
+    lifx_theme: '{{ theme | default('''') }}'
+- repeat:
+    while:
+    - condition: template
+      value_template: '{{ states(''input_text.outdoor_theme_key'') == key0 }}'
+    - condition: state
+      entity_id: light.outdoor_lights
+      state: 'on'
+    sequence:
+    - variables:
+        step: '{{ repeat.index }}'
+        bulbs: '{% set ns = namespace(l=[]) %}{% for e in (state_attr(''light.outdoor_lights'',''entity_id'')
+          or []) %}{% set s = states[e] %}{% if s is not none and s.state not in [''unavailable'',''unknown'']
+          and ''effect_move'' not in (s.attributes.effect_list | default([], true)) and ''hs'' in (s.attributes.supported_color_modes
+          | default([], true)) %}{% set ns.l = ns.l + [e] %}{% endif %}{% endfor %}{{ ns.l }}'
+    - variables:
+        lifx_bulbs: '{{ bulbs | select(''in'', integration_entities(''lifx'')) | list }}'
+        rotating: '{{ bulbs if lifx_theme | length == 0 else (bulbs | reject(''in'', integration_entities(''lifx''))
+          | list) }}'
+    - if:
+      - condition: template
+        value_template: '{{ lifx_theme | length > 0 and (lifx_bulbs | length) > 0 }}'
+      then:
+      - action: lifx.paint_theme
+        target:
+          entity_id: '{{ lifx_bulbs }}'
+        data:
+          theme: '{{ lifx_theme }}'
+          transition: 0
+        continue_on_error: true
+    - repeat:
+        for_each: '{{ rotating }}'
+        sequence:
+        - action: light.turn_on
+          target:
+            entity_id: '{{ repeat.item }}'
+          data:
+            hs_color: '{{ palette[(repeat.index - 1 + step) % (palette | length)] }}'
+            brightness: 255
+            transition: 0
+          continue_on_error: true
+      note: 'With a LIFX theme, LIFX bulbs are painted from it above and any other colour bulb rotates
+        the palette. Without one, every bulb rotates the palette.'
+    - delay:
+        seconds: '{{ step_s }}'

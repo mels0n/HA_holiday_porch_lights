@@ -1,6 +1,6 @@
 # ADR-0001: One rules table in the script, scenes for the looks
 
-Status: accepted (2026-09-30)
+Status: accepted (2026-09-30), superseded in part by ADR-0005 (2026-11-18)
 
 ## Context
 

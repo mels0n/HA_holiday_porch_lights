@@ -1,0 +1,321 @@
+# A sections view for the outdoor lights. Paste it into a dashboard: open the dashboard, three-dot
+# menu > Edit dashboard > three-dot menu > Raw configuration editor, and add it under `views:`.
+# Or add a view in the UI, switch it to Sections, and paste in this file's `sections:` list.
+#
+# Needs Mushroom from HACS (custom:mushroom-template-card). The tile cards are core.
+# Replace the entity ids to match yours, as listed in the README.
+type: sections
+title: Holiday lights
+path: holiday
+icon: mdi:string-lights
+max_columns: 3
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Right now
+        icon: mdi:string-lights
+      - type: tile
+        entity: script.outdoor_lights_fix
+        name: Fix the lights
+        icon: mdi:auto-fix
+        vertical: true
+        grid_options:
+          columns: full
+        tap_action:
+          action: perform-action
+          perform_action: script.outdoor_lights_fix
+          data:
+            turn_on: false
+      - type: tile
+        entity: script.outdoor_lights_fix
+        name: Turn on now
+        icon: mdi:lightbulb-on
+        vertical: true
+        tap_action:
+          action: perform-action
+          perform_action: script.outdoor_lights_fix
+          data:
+            turn_on: true
+      - type: tile
+        entity: light.outdoor_lights
+        name: All off
+        icon: mdi:lightbulb-off
+        vertical: true
+        tap_action:
+          action: perform-action
+          perform_action: script.outdoor_lights_off
+      - type: tile
+        entity: input_text.porch_theme
+        name: Tonight's theme
+        icon: mdi:string-lights
+        grid_options:
+          columns: full
+      - type: tile
+        entity: light.outdoor_lights
+        name: All lights
+      - type: tile
+        entity: light.porch_strand
+        name: Strand
+      - type: tile
+        entity: light.porch_left
+        name: Left
+      - type: tile
+        entity: light.porch_right
+        name: Right
+      - type: tile
+        entity: light.back_porch
+        name: Back porch
+      - type: tile
+        entity: script.outdoor_bulb_chase
+        name: Bulb loop
+        icon_tap_action:
+          action: none
+        tap_action:
+          action: more-info
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Pick a theme
+        icon: mdi:palette
+      - type: tile
+        entity: input_select.outdoor_theme_override
+        name: Theme
+        features:
+          - type: select-options
+        features_position: bottom
+        grid_options:
+          columns: full
+      # One tap buttons. Each sets the override select, which runs Fix through the nightly automation.
+      # Copy a block for each theme you want a button for.
+      - type: custom:mushroom-template-card
+        primary: Auto
+        icon: mdi:calendar-sync
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: Auto
+      - type: custom:mushroom-template-card
+        primary: Christmas
+        icon: mdi:pine-tree
+        icon_color: red
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: Christmas
+      - type: custom:mushroom-template-card
+        primary: Halloween
+        icon: mdi:halloween
+        icon_color: orange
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: Halloween
+      - type: custom:mushroom-template-card
+        primary: Thanksgiving
+        icon: mdi:turkey
+        icon_color: brown
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: Thanksgiving
+      - type: custom:mushroom-template-card
+        primary: Fourth of July
+        icon: mdi:flag
+        icon_color: blue
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: Fourth of July
+      - type: custom:mushroom-template-card
+        primary: Game day
+        icon: mdi:soccer
+        icon_color: indigo
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: Game day
+      - type: custom:mushroom-template-card
+        primary: White
+        icon: mdi:lightbulb
+        icon_color: amber
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: White
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Paint the house
+        icon: mdi:palette-swatch
+      - type: tile
+        entity: input_select.outdoor_paint_theme
+        name: LIFX theme
+        features:
+          - type: select-options
+        features_position: bottom
+        grid_options:
+          columns: full
+      - type: custom:mushroom-template-card
+        primary: Paint this theme
+        icon: mdi:brush
+        layout: vertical
+        grid_options:
+          columns: full
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: "Paint: LIFX theme"
+      # Each swatch shows its hue; the slider under it sets the hue (0 to 360).
+      - type: custom:mushroom-template-card
+        primary: Colour 1
+        secondary: "{{ states('input_number.outdoor_paint_colour_1') | int(0) }}"
+        icon: mdi:circle
+        icon_color: "hsl({{ states('input_number.outdoor_paint_colour_1') | int(0) }}, 100%, 50%)"
+      - type: tile
+        entity: input_number.outdoor_paint_colour_1
+        name: Hue 1
+        features:
+          - type: numeric-input
+            style: slider
+      - type: custom:mushroom-template-card
+        primary: Colour 2
+        secondary: "{{ states('input_number.outdoor_paint_colour_2') | int(120) }}"
+        icon: mdi:circle
+        icon_color: "hsl({{ states('input_number.outdoor_paint_colour_2') | int(120) }}, 100%, 50%)"
+      - type: tile
+        entity: input_number.outdoor_paint_colour_2
+        name: Hue 2
+        features:
+          - type: numeric-input
+            style: slider
+      - type: custom:mushroom-template-card
+        primary: Colour 3
+        secondary: "{{ states('input_number.outdoor_paint_colour_3') | int(240) }}"
+        icon: mdi:circle
+        icon_color: "hsl({{ states('input_number.outdoor_paint_colour_3') | int(240) }}, 100%, 50%)"
+      - type: tile
+        entity: input_number.outdoor_paint_colour_3
+        name: Hue 3
+        features:
+          - type: numeric-input
+            style: slider
+      - type: markdown
+        content: "Hue cheat sheet: 0 red, 30 orange, 60 yellow, 120 green, 180 cyan, 240 blue, 280 purple, 320 pink."
+        grid_options:
+          columns: full
+      - type: custom:mushroom-template-card
+        primary: Paint my colours
+        icon: mdi:brush-variant
+        layout: vertical
+        grid_options:
+          columns: full
+        tap_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.outdoor_theme_override
+          data:
+            option: "Paint: my colours"
+      - type: tile
+        entity: input_number.outdoor_paint_speed
+        name: Speed (seconds across the strand, 0 = still)
+        features:
+          - type: numeric-input
+            style: slider
+        grid_options:
+          columns: full
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Live match (optional)
+        icon: mdi:soccer
+      - type: tile
+        entity: sensor.team_tracker
+        name: Match
+      - type: tile
+        entity: input_boolean.match_window
+        name: Match window
+      - type: tile
+        entity: input_number.goal_delay
+        name: Goal delay (seconds)
+        features:
+          - type: numeric-input
+            style: slider
+        grid_options:
+          columns: full
+      - type: tile
+        entity: script.goal_celebration
+        name: Test goal show
+        icon: mdi:firework
+        tap_action:
+          action: perform-action
+          perform_action: script.goal_celebration
+          data:
+            goals: 1
+          confirmation:
+            text: Run the goal show now?
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Under the hood
+        icon: mdi:cog
+      - type: tile
+        entity: automation.nightly_outdoor_lights
+      - type: tile
+        entity: automation.live_match_window
+      - type: tile
+        entity: automation.outdoor_light_reconnect
+      - type: tile
+        entity: script.outdoor_resolve_theme
+        icon_tap_action:
+          action: none
+        tap_action:
+          action: more-info
+      - type: tile
+        entity: script.outdoor_apply_theme
+        icon_tap_action:
+          action: none
+        tap_action:
+          action: more-info
+      - type: tile
+        entity: input_text.outdoor_theme_key
+        name: Theme key
+      - type: tile
+        entity: sensor.outdoor_lights_available
+        name: Lights online
