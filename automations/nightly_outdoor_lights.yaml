@@ -1,0 +1,122 @@
+# Automation. Settings > Automations & scenes > Create automation > three-dot menu > Edit in YAML.
+alias: Nightly outdoor lights
+description: Runs the outdoor lights from 30 minutes before sunset until 23:59, themed for holidays, games
+  and manual picks. At sunset-30 (and on an HA start inside that window) it runs script.outdoor_resolve_theme
+  then script.outdoor_apply_theme on every member of light.outdoor_lights. At 23:59 it resets input_select.outdoor_theme_override
+  to Auto, stops the bulb chase and strand effects and turns light.outdoor_lights off. A change on the
+  Holiday Lights dashboard view (theme pick, or paint settings while a manual theme is picked) runs script.outdoor_lights_fix.
+  Pressing Run on this automation also runs script.outdoor_lights_fix. Lights-off is its own trigger so
+  a restart or a script error cannot skip it.
+triggers:
+- trigger: sun
+  event: sunset
+  offset: -00:30:00
+  id: lights_on
+- trigger: time
+  at: '23:59:00'
+  id: lights_off
+- trigger: homeassistant
+  event: start
+  id: ha_start
+  note: 'Missed-run reconciler: if HA was down at sunset-30, the lights would otherwise stay off for the
+    evening.'
+- trigger: state
+  entity_id: input_select.outdoor_theme_override
+  id: override
+  note: Theme picked on the Holiday Lights dashboard (or set back to Auto).
+- trigger: state
+  entity_id:
+  - input_select.outdoor_paint_theme
+  - input_number.outdoor_paint_colour_1
+  - input_number.outdoor_paint_colour_2
+  - input_number.outdoor_paint_colour_3
+  - input_number.outdoor_paint_speed
+  id: paint
+  note: Paint settings changed; only acts while a manual theme is picked.
+conditions: []
+actions:
+- choose:
+  - alias: Sunset - resolve and apply tonight's theme
+    conditions:
+    - condition: trigger
+      id:
+      - lights_on
+    sequence:
+    - action: script.outdoor_resolve_theme
+      data: {}
+    - action: script.outdoor_apply_theme
+      data: {}
+  - alias: 23:59 - stop effects and turn the outside lights off
+    conditions:
+    - condition: trigger
+      id:
+      - lights_off
+    sequence:
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.outdoor_theme_override
+      data:
+        option: Auto
+      note: A manual theme or paint lasts until 23:59, then the calendar takes over again.
+    - action: script.turn_off
+      target:
+        entity_id: script.outdoor_bulb_chase
+      continue_on_error: true
+    - variables:
+        strands: '{% set ns = namespace(l=[]) %}{% for e in (state_attr(''light.outdoor_lights'',''entity_id'')
+          or []) %}{% set s = states[e] %}{% if s is not none and s.state not in [''unavailable'',''unknown'']
+          and ''effect_move'' in (s.attributes.effect_list | default([], true)) %}{% set ns.l = ns.l +
+          [e] %}{% endif %}{% endfor %}{{ ns.l }}'
+    - if:
+      - condition: template
+        value_template: '{{ strands | length > 0 }}'
+      then:
+      - action: lifx.effect_stop
+        target:
+          entity_id: '{{ strands }}'
+        continue_on_error: true
+    - action: light.turn_off
+      target:
+        entity_id: light.outdoor_lights
+  - alias: HA start inside the evening window - re-apply tonight's lights
+    conditions:
+    - condition: trigger
+      id:
+      - ha_start
+    - condition: sun
+      after: sunset
+      after_offset: -00:30:00
+      note: 'Only between sunset-30 and 23:59. Outside that window a restart does nothing: before sunset
+        the normal trigger will fire, and after 23:59 the lights should already be off.'
+    - condition: time
+      before: '23:59:00'
+    sequence:
+    - action: script.outdoor_resolve_theme
+      data: {}
+    - action: script.outdoor_apply_theme
+      data: {}
+  - alias: Dashboard theme pick changed - fix (applies, or turns off outside the window when back to Auto)
+    conditions:
+    - condition: trigger
+      id:
+      - override
+    sequence:
+    - action: script.outdoor_lights_fix
+  - alias: Paint settings changed while a manual theme is picked - fix
+    conditions:
+    - condition: trigger
+      id:
+      - paint
+    - condition: not
+      conditions:
+      - condition: state
+        entity_id: input_select.outdoor_theme_override
+        state: Auto
+    sequence:
+    - action: script.outdoor_lights_fix
+  default:
+  - action: script.outdoor_lights_fix
+    note: 'Manual Run (no trigger) = the Fix button: re-pick and re-apply now, or turn off outside the
+      evening window.'
+mode: queued
+max: 5

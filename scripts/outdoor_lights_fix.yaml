@@ -1,0 +1,63 @@
+# Script. Settings > Automations & scenes > Scripts > Add script > three-dot menu > Edit in YAML.
+# Save it as script.outdoor_lights_fix (the entity id comes from the name).
+alias: 'Holiday lights: Fix'
+icon: mdi:auto-fix
+mode: queued
+max: 3
+description: 'The one button that puts the outdoor lights back to what they should be right now. Stops
+  the bulb chase and every strand effect, re-picks the theme (script.outdoor_resolve_theme), then: between
+  sunset-30 and 23:59 (or with turn_on, or while a manual theme or paint is picked) re-applies it to every
+  light in light.outdoor_lights; outside those hours it turns light.outdoor_lights off. Use it after a
+  strand re-calibration, a power blip, or anything that looks wrong. Also run by the nightly automation''s
+  Run button and by every dashboard change.'
+fields:
+  turn_on:
+    name: Turn on even outside the evening window
+    description: Apply the theme now even in daytime or after 23:59.
+    required: false
+    default: false
+    selector:
+      boolean: {}
+sequence:
+- action: script.turn_off
+  target:
+    entity_id: script.outdoor_bulb_chase
+  continue_on_error: true
+- action: script.outdoor_resolve_theme
+- if:
+  - condition: or
+    conditions:
+    - condition: and
+      conditions:
+      - condition: sun
+        after: sunset
+        after_offset: -00:30:00
+      - condition: time
+        before: '23:59:00'
+    - condition: template
+      value_template: '{{ turn_on | default(false) | bool }}'
+    - condition: not
+      conditions:
+      - condition: state
+        entity_id: input_select.outdoor_theme_override
+        state: Auto
+  then:
+  - action: script.outdoor_apply_theme
+    note: 'Full apply: stops the chase, effect_stop + re-applies each strand, restarts the chase.'
+  else:
+  - variables:
+      strands: '{% set ns = namespace(l=[]) %}{% for e in (state_attr(''light.outdoor_lights'',''entity_id'')
+        or []) %}{% set s = states[e] %}{% if s is not none and s.state not in [''unavailable'',''unknown'']
+        and ''effect_move'' in (s.attributes.effect_list | default([], true)) %}{% set ns.l = ns.l + [e]
+        %}{% endif %}{% endfor %}{{ ns.l }}'
+  - if:
+    - condition: template
+      value_template: '{{ strands | length > 0 }}'
+    then:
+    - action: lifx.effect_stop
+      target:
+        entity_id: '{{ strands }}'
+      continue_on_error: true
+  - action: light.turn_off
+    target:
+      entity_id: light.outdoor_lights

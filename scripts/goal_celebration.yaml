@@ -1,0 +1,149 @@
+# Script. Settings > Automations & scenes > Scripts > Add script > three-dot menu > Edit in YAML.
+# Save it as script.goal_celebration (the entity id comes from the name).
+alias: Goal Celebration
+icon: mdi:firework
+mode: restart
+description: '10 s of fireworks on the colour outdoor lights (strand: LIFX fireworks_finale at fastest
+  move; colour bulbs: fast colour loop), then flashes the team colours 1 s on / 1 s off once per goal
+  (sensor.team_tracker team_score; field goals overrides), then re-applies the active outdoor theme. Waits
+  input_number.goal_delay seconds first. The red and blue values are an example: swap in your team''s
+  hues.'
+fields:
+  goals:
+    name: Goals
+    description: Optional flash count override (testing).
+    required: false
+    selector:
+      number:
+        min: 1
+        max: 10
+sequence:
+- delay:
+    seconds: '{{ states(''input_number.goal_delay'') | int(0) }}'
+- variables:
+    targets: '{{ expand(''light.outdoor_lights'') | selectattr(''state'', ''ne'', ''unavailable'') | selectattr(''attributes.supported_color_modes'',
+      ''defined'') | selectattr(''attributes.supported_color_modes'', ''contains'', ''hs'') | map(attribute=''entity_id'')
+      | list }}'
+    strands: '{{ expand(''light.outdoor_lights'') | selectattr(''state'', ''ne'', ''unavailable'') | selectattr(''attributes.effect_list'',
+      ''defined'') | selectattr(''attributes.effect_list'', ''contains'', ''effect_move'') | map(attribute=''entity_id'')
+      | list }}'
+    flashes: '{{ [[(goals | default(state_attr(''sensor.team_tracker'', ''team_score''))) | int(1), 1]
+      | max, 10] | min }}'
+- variables:
+    bulbs: '{{ targets | reject(''in'', strands) | list }}'
+- action: script.turn_off
+  target:
+    entity_id: script.outdoor_bulb_chase
+  continue_on_error: true
+- if:
+  - condition: template
+    value_template: '{{ targets | length > 0 }}'
+  then:
+  - action: lifx.effect_stop
+    target:
+      entity_id: '{{ targets }}'
+    continue_on_error: true
+- if:
+  - condition: template
+    value_template: '{{ strands | length > 0 }}'
+  then:
+  - action: light.turn_on
+    target:
+      entity_id: '{{ strands }}'
+    data:
+      brightness: 255
+    continue_on_error: true
+  - action: lifx.effect_move
+    target:
+      entity_id: '{{ strands }}'
+    data:
+      theme: fireworks_finale
+      speed: 1
+      direction: right
+      power_on: true
+    continue_on_error: true
+- if:
+  - condition: template
+    value_template: '{{ bulbs | length > 0 }}'
+  then:
+  - action: lifx.effect_colorloop
+    target:
+      entity_id: '{{ bulbs }}'
+    data:
+      brightness: 255
+      period: 1
+      change: 120
+      spread: 180
+      saturation_min: 90
+      saturation_max: 100
+      transition: 0
+      power_on: true
+    continue_on_error: true
+- delay:
+    seconds: 10
+- if:
+  - condition: template
+    value_template: '{{ targets | length > 0 }}'
+  then:
+  - action: lifx.effect_stop
+    target:
+      entity_id: '{{ targets }}'
+    continue_on_error: true
+  - delay:
+      milliseconds: 500
+  - repeat:
+      for_each: '{{ strands }}'
+      sequence:
+      - action: lifx.set_state
+        target:
+          entity_id: '{{ repeat.item }}'
+        data:
+          zones: '{%- set ns = namespace(z=[]) -%}{%- for z in range(120) -%}{%- if (z // 4) % 2 == 0
+            -%}{%- set ns.z = ns.z + [z] -%}{%- endif -%}{%- endfor -%}{{ ns.z }}'
+          hs_color: [340, 100]
+          brightness: 255
+          transition: 0
+        continue_on_error: true
+      - action: lifx.set_state
+        target:
+          entity_id: '{{ repeat.item }}'
+        data:
+          zones: '{%- set ns = namespace(z=[]) -%}{%- for z in range(120) -%}{%- if (z // 4) % 2 == 1
+            -%}{%- set ns.z = ns.z + [z] -%}{%- endif -%}{%- endfor -%}{{ ns.z }}'
+          hs_color: [220, 100]
+          brightness: 255
+          transition: 0
+        continue_on_error: true
+    alias: 'Paint team colours: strand red/blue 4-zone blocks, bulbs blue/red'
+  - repeat:
+      for_each: '{{ bulbs }}'
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: '{{ repeat.item }}'
+        data:
+          hs_color: '{{ [220, 100] if repeat.index % 2 == 1 else [340, 100] }}'
+          brightness: 255
+          transition: 0
+        continue_on_error: true
+  - alias: 'Flash once per goal: 1 s off, 1 s on'
+    repeat:
+      count: '{{ flashes }}'
+      sequence:
+      - action: light.turn_off
+        target:
+          entity_id: '{{ targets }}'
+        data:
+          transition: 0
+        continue_on_error: true
+      - delay:
+          seconds: 1
+      - action: light.turn_on
+        target:
+          entity_id: '{{ targets }}'
+        data:
+          transition: 0
+        continue_on_error: true
+      - delay:
+          seconds: 1
+- action: script.outdoor_apply_theme

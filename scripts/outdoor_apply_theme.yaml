@@ -1,0 +1,437 @@
+# Script. Settings > Automations & scenes > Scripts > Add script > three-dot menu > Edit in YAML.
+# Save it as script.outdoor_apply_theme (the entity id comes from the name).
+alias: Outdoor Apply Theme
+icon: mdi:string-lights
+mode: queued
+max: 5
+description: 'Applies the theme named in input_text.outdoor_theme_key to the members of light.outdoor_lights.
+  Member kinds are detected at run time: strand = effect_list contains effect_move; colour bulb = supports
+  hs (and not a strand); everything else is white-only. With no target the whole group is applied and
+  the chase script is stopped first; with a target only that light is applied. Theme white powers LIFX
+  bulbs on and sets the strand, and any bulb in a colour mode, to white_kelvin and white_brightness. Keys
+  paint_theme and paint_custom are built at run time from the paint helpers (input_select.outdoor_paint_theme,
+  input_number.outdoor_paint_colour_1..3, input_number.outdoor_paint_speed; speed 0 = still).'
+fields:
+  target:
+    name: Target
+    description: Optional single light to apply to instead of the whole group.
+    required: false
+    selector:
+      entity:
+        domain: light
+variables:
+  # Theme white. Fixed values here. To follow a circadian lighting setup instead, point these at its
+  # colour temperature and brightness sensors, for example
+  # '{{ states('sensor.circadian_color_temp') | int(2700) }}'.
+  white_kelvin: 2700
+  white_brightness: 255
+  themes:
+    christmas:
+      strand:
+        mode: move
+        theme: christmas
+        palette: []
+        speed: 4
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[0, 100], [120, 100]]
+        interval: 5
+    halloween:
+      strand:
+        mode: move
+        theme: halloween
+        palette: []
+        speed: 6
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[30, 100], [270, 80]]
+        interval: 5
+    thanksgiving:
+      strand:
+        mode: move
+        theme: thanksgiving
+        palette: []
+        speed: 6
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[50, 100], [30, 100], [0, 100]]
+        interval: 5
+    new_year:
+      strand:
+        mode: move
+        theme: fireworks_finale
+        palette: []
+        speed: 1.5
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[45, 80], [0, 0]]
+        interval: 5
+    independence:
+      strand:
+        mode: move
+        theme: old_glory
+        palette: []
+        speed: 3
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[0, 100], [0, 0], [240, 100]]
+        interval: 5
+    civic:
+      strand:
+        mode: move
+        theme: usa
+        palette: []
+        speed: 5
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[0, 100], [0, 0], [240, 100]]
+        interval: 5
+    memorial:
+      strand:
+        mode: move
+        theme: memorial_day
+        palette: []
+        speed: 8
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[0, 100], [0, 0], [240, 100]]
+        interval: 5
+    mlk:
+      strand:
+        mode: blocks
+        colors: [[255, 100], [120, 100]]
+        block: 4
+        speed: 60
+        direction: right
+        then_move: true
+      bulbs:
+        mode: chase
+        colors: [[255, 100], [120, 100]]
+        interval: 20
+    valentines:
+      strand:
+        mode: move
+        theme: be_my_valentine
+        palette: []
+        speed: 6
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[300, 100], [350, 100]]
+        interval: 5
+    st_patricks:
+      strand:
+        mode: move
+        theme: st_patricks_day
+        palette: []
+        speed: 5
+        direction: right
+        then_move: false
+      bulbs:
+        mode: chase
+        colors: [[120, 100], [90, 80]]
+        interval: 5
+    team:
+      strand:
+        mode: blocks
+        colors: [[340, 100], [220, 100], [340, 100], [200, 60]]
+        block: 4
+        speed: 60
+        direction: right
+        then_move: true
+      bulbs:
+        mode: chase
+        colors: [[220, 100], [340, 100]]
+        interval: 20
+    white:
+      strand:
+        mode: white
+      bulbs:
+        mode: white
+    club_team:
+      strand:
+        mode: blocks
+        colors: [[120, 100], [40, 85]]
+        block: 4
+        speed: 60
+        direction: right
+        then_move: true
+      bulbs:
+        mode: chase
+        colors: [[120, 100], [40, 85]]
+        interval: 20
+  key: '{{ states(''input_text.outdoor_theme_key'') }}'
+  theme: '{%- if key == ''paint_theme'' -%}{%- set sp = states(''input_number.outdoor_paint_speed'') |
+    float(6) -%}{{ {''strand'': {''mode'': ''move'' if sp > 0 else ''paint'', ''theme'': states(''input_select.outdoor_paint_theme''),
+    ''palette'': [], ''speed'': sp, ''direction'': ''right'', ''then_move'': false}, ''bulbs'': {''mode'':
+    ''chase'', ''colors'': [[0, 100], [120, 100]], ''interval'': 5}} }}{%- elif key == ''paint_custom''
+    -%}{%- set sp = states(''input_number.outdoor_paint_speed'') | float(6) -%}{%- set c = [[states(''input_number.outdoor_paint_colour_1'')
+    | int(0), 100], [states(''input_number.outdoor_paint_colour_2'') | int(120), 100], [states(''input_number.outdoor_paint_colour_3'')
+    | int(240), 100]] -%}{{ {''strand'': {''mode'': ''blocks'', ''colors'': c, ''block'': 4, ''speed'':
+    (sp if sp > 0 else 60), ''direction'': ''right'', ''then_move'': sp > 0}, ''bulbs'': {''mode'': ''chase'',
+    ''colors'': c, ''interval'': 20}} }}{%- else -%}{{ themes.get(key, themes[''white'']) }}{%- endif
+    -%}'
+  is_white: '{{ key == ''white'' or (key not in themes and key not in [''paint_theme'', ''paint_custom''])
+    }}'
+  full: '{{ target is not defined or not target }}'
+  members: '{{ state_attr(''light.outdoor_lights'',''entity_id'') or [] }}'
+  tgt: '{{ members if full else [target] }}'
+  classes: '{%- set ns = namespace(s=[], c=[], w=[], ca=[]) -%}{%- for e in members -%}{%- set st = states[e]
+    -%}{%- if st is not none and st.state not in [''unavailable'',''unknown''] and ''effect_move'' not
+    in (st.attributes.effect_list | default([], true)) and ''hs'' in (st.attributes.supported_color_modes
+    | default([], true)) -%}{%- set ns.ca = ns.ca + [e] -%}{%- endif -%}{%- endfor -%}{%- for e in tgt
+    -%}{%- set st = states[e] -%}{%- if st is not none and st.state not in [''unavailable'',''unknown'']
+    -%}{%- if ''effect_move'' in (st.attributes.effect_list | default([], true)) -%}{%- set ns.s = ns.s
+    + [e] -%}{%- elif ''hs'' in (st.attributes.supported_color_modes | default([], true)) -%}{%- set ns.c
+    = ns.c + [e] -%}{%- else -%}{%- set ns.w = ns.w + [e] -%}{%- endif -%}{%- endif -%}{%- endfor -%}{{
+    {''s'': ns.s, ''c'': ns.c, ''w'': ns.w, ''ca'': ns.ca} }}'
+sequence:
+- alias: 'Full apply: stop the running chase'
+  if:
+  - condition: template
+    value_template: '{{ full }}'
+  then:
+  - action: script.turn_off
+    target:
+      entity_id: script.outdoor_bulb_chase
+    continue_on_error: true
+- alias: Strands
+  repeat:
+    for_each: '{{ classes.s }}'
+    sequence:
+    - action: lifx.effect_stop
+      target:
+        entity_id: '{{ repeat.item }}'
+      continue_on_error: true
+    - delay:
+        seconds: 1
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: '{{ is_white }}'
+        sequence:
+        - action: light.turn_on
+          target:
+            entity_id: '{{ repeat.item }}'
+          data:
+            color_temp_kelvin: '{{ [[white_kelvin, state_attr(repeat.item, ''min_color_temp_kelvin'')
+              | int(2700)] | max, state_attr(repeat.item, ''max_color_temp_kelvin'') | int(6500)] | min
+              }}'
+            brightness: '{{ white_brightness }}'
+          continue_on_error: true
+      default:
+      - variables:
+          s: '{{ theme.strand }}'
+          strand: '{{ repeat.item }}'
+      - action: light.turn_on
+        target:
+          entity_id: '{{ strand }}'
+        data:
+          brightness: 255
+        continue_on_error: true
+        note: effect_move has no brightness field, so brightness is set first.
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ s.mode == ''blocks'' }}'
+          sequence:
+          - repeat:
+              for_each: '{{ range(s.colors | length) | list }}'
+              sequence:
+              - action: lifx.set_state
+                target:
+                  entity_id: '{{ strand }}'
+                data:
+                  zones: '{%- set ns = namespace(z=[]) -%}{%- for z in range(s.zones | default(120)) -%}{%-
+                    if (z // s.block) % (s.colors | length) == repeat.item -%}{%- set ns.z = ns.z + [z]
+                    -%}{%- endif -%}{%- endfor -%}{{ ns.z }}'
+                  hs_color: '{{ s.colors[repeat.item] }}'
+                  brightness: 255
+                  transition: 0
+                continue_on_error: true
+          - if:
+            - condition: template
+              value_template: '{{ s.then_move }}'
+            then:
+            - delay:
+                seconds: 1
+            - action: lifx.effect_move
+              target:
+                entity_id: '{{ strand }}'
+              data:
+                speed: '{{ s.speed }}'
+                direction: '{{ s.direction }}'
+              continue_on_error: true
+        - conditions:
+          - condition: template
+            value_template: '{{ s.mode == ''move'' }}'
+          sequence:
+          - action: lifx.effect_move
+            target:
+              entity_id: '{{ strand }}'
+            data:
+              theme: '{{ s.theme }}'
+              speed: '{{ s.speed }}'
+              direction: '{{ s.direction }}'
+            continue_on_error: true
+        - conditions:
+          - condition: template
+            value_template: '{{ s.mode == ''paint'' and (s.palette | length) > 0 }}'
+          sequence:
+          - action: lifx.paint_theme
+            target:
+              entity_id: '{{ strand }}'
+            data:
+              palette: '{{ s.palette }}'
+            continue_on_error: true
+          - if:
+            - condition: template
+              value_template: '{{ s.then_move }}'
+            then:
+            - delay:
+                seconds: 1
+            - action: lifx.effect_move
+              target:
+                entity_id: '{{ strand }}'
+              data:
+                speed: '{{ s.speed }}'
+                direction: '{{ s.direction }}'
+              continue_on_error: true
+        - conditions:
+          - condition: template
+            value_template: '{{ s.mode == ''paint'' }}'
+          sequence:
+          - action: lifx.paint_theme
+            target:
+              entity_id: '{{ strand }}'
+            data:
+              theme: '{{ s.theme }}'
+              transition: 0
+            continue_on_error: true
+          - if:
+            - condition: template
+              value_template: '{{ s.then_move }}'
+            then:
+            - delay:
+                seconds: 1
+            - action: lifx.effect_move
+              target:
+                entity_id: '{{ strand }}'
+              data:
+                speed: '{{ s.speed }}'
+                direction: '{{ s.direction }}'
+              continue_on_error: true
+        note: 'blocks: paints exact colour blocks by zone index (block zones per colour, repeating) with
+          lifx.set_state, then effect_move with no theme scrolls those zone colours. paint_theme with
+          a palette blends hues between colours on the strand, so custom themes use blocks. paint (with
+          a theme): a still LIFX theme, used by Paint: LIFX theme at speed 0.'
+- alias: Colour bulbs, coloured themes
+  if:
+  - condition: template
+    value_template: '{{ not is_white and (classes.c | length) > 0 }}'
+  then:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ theme.bulbs.mode == ''chase'' }}'
+      sequence:
+      - if:
+        - condition: template
+          value_template: '{{ full or is_state(''script.outdoor_bulb_chase'', ''off'') }}'
+        then:
+        - action: script.turn_on
+          target:
+            entity_id: script.outdoor_bulb_chase
+          data:
+            variables:
+              colors: '{{ theme.bulbs.colors }}'
+              interval: '{{ theme.bulbs.interval }}'
+              theme: '{{ theme.strand.theme if theme.strand.mode in [''move'', ''paint''] and theme.strand.get(''theme'')
+                else '''' }}'
+    default:
+    - repeat:
+        for_each: '{{ classes.c }}'
+        sequence:
+        - action: light.turn_on
+          target:
+            entity_id: '{{ repeat.item }}'
+          data:
+            hs_color: '{{ theme.bulbs.colors[(classes.ca.index(repeat.item) if repeat.item in classes.ca
+              else 0) % (theme.bulbs.colors | length)] }}'
+            brightness: 255
+            transition: 0
+          continue_on_error: true
+  note: 'Holidays and Paint: LIFX theme pass the strand''s LIFX theme to the bulb chase, which repaints
+    the bulbs with random colours from it every 5 s, so a pale or matching pair never lasts long. Custom
+    themes (club team, game day, MLK, Paint: my colours) rotate their own colour list every 20 s, each
+    bulb offset. All changes are instant.'
+- alias: White-only members, coloured themes
+  if:
+  - condition: template
+    value_template: '{{ not is_white and (classes.w | length) > 0 }}'
+  then:
+  - repeat:
+      for_each: '{{ classes.w }}'
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: '{{ repeat.item }}'
+        data:
+          color_temp_kelvin: '{{ [[theme.get(''kelvin'', 2700), state_attr(repeat.item, ''min_color_temp_kelvin'')
+            | int(2700)] | max, state_attr(repeat.item, ''max_color_temp_kelvin'') | int(6500)] | min
+            }}'
+          brightness: 255
+        continue_on_error: true
+- alias: 'Theme white: bulbs'
+  if:
+  - condition: template
+    value_template: '{{ is_white }}'
+  then:
+  - repeat:
+      for_each: '{{ classes.c + classes.w }}'
+      sequence:
+      - variables:
+          bulb: '{{ repeat.item }}'
+          needs_ct: '{{ state_attr(repeat.item, ''color_mode'') not in [none, ''color_temp''] }}'
+      - if:
+        - condition: template
+          value_template: '{{ bulb in integration_entities(''lifx'') }}'
+        then:
+        - action: lifx.set_state
+          target:
+            entity_id: '{{ bulb }}'
+          data:
+            power: true
+          continue_on_error: true
+        else:
+        - action: light.turn_on
+          target:
+            entity_id: '{{ bulb }}'
+          continue_on_error: true
+      - if:
+        - condition: template
+          value_template: '{{ needs_ct }}'
+        then:
+        - action: light.turn_on
+          target:
+            entity_id: '{{ bulb }}'
+          data:
+            color_temp_kelvin: '{{ [[white_kelvin, state_attr(bulb, ''min_color_temp_kelvin'') | int(2700)]
+              | max, state_attr(bulb, ''max_color_temp_kelvin'') | int(6500)] | min }}'
+            brightness: '{{ white_brightness }}'
+          continue_on_error: true
