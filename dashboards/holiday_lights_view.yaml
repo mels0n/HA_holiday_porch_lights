@@ -20,7 +20,6 @@ sections:
         name: Fix the lights
         icon: mdi:auto-fix
         vertical: true
-        state_content: input_text.porch_theme
         grid_options:
           columns: full
         tap_action:
@@ -45,9 +44,7 @@ sections:
         vertical: true
         tap_action:
           action: perform-action
-          perform_action: light.turn_off
-          target:
-            entity_id: light.outdoor_lights
+          perform_action: script.outdoor_lights_off
       - type: tile
         entity: input_text.porch_theme
         name: Tonight's theme
@@ -72,6 +69,10 @@ sections:
       - type: tile
         entity: script.outdoor_bulb_chase
         name: Bulb loop
+        icon_tap_action:
+          action: none
+        tap_action:
+          action: more-info
 
   - type: grid
     cards:
@@ -302,8 +303,16 @@ sections:
         entity: automation.outdoor_light_reconnect
       - type: tile
         entity: script.outdoor_resolve_theme
+        icon_tap_action:
+          action: none
+        tap_action:
+          action: more-info
       - type: tile
         entity: script.outdoor_apply_theme
+        icon_tap_action:
+          action: none
+        tap_action:
+          action: more-info
       - type: tile
         entity: input_text.outdoor_theme_key
         name: Theme key

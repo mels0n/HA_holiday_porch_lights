@@ -36,7 +36,8 @@ input_select:
     icon: mdi:palette
     # Auto lets the calendars decide. Anything else wins until 23:59, when the nightly automation
     # sets it back to Auto. The option names are matched by script.outdoor_resolve_theme.
-    initial: Auto
+    # initial: Auto so a restart also drops a manual pick. The helpers below have no initial:
+    # value, so they keep their last setting across a restart.
     options:
       - Auto
       - "Paint: LIFX theme"
@@ -58,8 +59,7 @@ input_select:
     name: Outdoor paint theme
     icon: mdi:palette-swatch
     # A curated slice of the LIFX themes. The strand's own Theme select lists all of them; any name
-    # from that list works here if you add it.
-    initial: candy_cane
+    # from that list works here if you add it. Before you first choose one it sits on the first option.
     options:
       - autumn
       - be_my_valentine
@@ -107,7 +107,8 @@ input_select:
       - warming
 
 input_number:
-  # Hues for Paint my colours (0 to 360). Saturation is always 100.
+  # Hues for Paint my colours (0 to 360). Saturation is always 100. A new helper starts at 0, so set
+  # the three sliders and the speed once after installing.
   outdoor_paint_colour_1:
     name: Paint colour 1
     icon: mdi:palette
@@ -115,7 +116,6 @@ input_number:
     max: 360
     step: 1
     mode: slider
-    initial: 0
   outdoor_paint_colour_2:
     name: Paint colour 2
     icon: mdi:palette
@@ -123,7 +123,6 @@ input_number:
     max: 360
     step: 1
     mode: slider
-    initial: 120
   outdoor_paint_colour_3:
     name: Paint colour 3
     icon: mdi:palette
@@ -131,7 +130,6 @@ input_number:
     max: 360
     step: 1
     mode: slider
-    initial: 240
   # Seconds for a pattern to cross the whole strand. 0 = still, 60 is the LIFX maximum.
   outdoor_paint_speed:
     name: Paint speed
@@ -141,7 +139,6 @@ input_number:
     step: 1
     mode: slider
     unit_of_measurement: s
-    initial: 6
   # Optional, for the live match automation: seconds to wait before a goal show (broadcast lag).
   goal_delay:
     name: Goal delay
@@ -151,7 +148,6 @@ input_number:
     step: 1
     mode: slider
     unit_of_measurement: s
-    initial: 0
 
 input_boolean:
   # Optional, for the live match automation. On while a match is live.
@@ -161,14 +157,13 @@ input_boolean:
 
 template:
   - sensor:
-      # Comma list of the group members that are currently available. The reconnect automation
-      # compares the old and new value to see which light just came back.
+      # Count of the group members that are currently available. The members attribute holds the list;
+      # the reconnect automation compares the old and new list to see which light just came back.
       - name: Outdoor lights available
         unique_id: outdoor_lights_available
         icon: mdi:lightbulb-group
         state: >-
-          {% set ns = namespace(l=[]) %}
-          {% for e in (state_attr('light.outdoor_lights', 'entity_id') or []) %}
-          {% if states(e) not in ['unavailable', 'unknown'] %}{% set ns.l = ns.l + [e] %}{% endif %}
-          {% endfor %}
-          {{ ns.l | join(',') }}
+          {{ (state_attr('light.outdoor_lights', 'entity_id') or []) | select('has_value') | list | length }}
+        attributes:
+          members: >-
+            {{ (state_attr('light.outdoor_lights', 'entity_id') or []) | select('has_value') | list }}

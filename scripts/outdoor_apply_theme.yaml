@@ -146,6 +146,7 @@ variables:
         mode: chase
         colors: [[120, 100], [90, 80]]
         interval: 5
+    # Team colours. goal_celebration.yaml holds the same two colours as team_a and team_b: change both.
     team:
       strand:
         mode: blocks
@@ -166,14 +167,14 @@ variables:
     club_team:
       strand:
         mode: blocks
-        colors: [[120, 100], [40, 85]]
+        colors: [[270, 100], [180, 60]]
         block: 4
         speed: 60
         direction: right
         then_move: true
       bulbs:
         mode: chase
-        colors: [[120, 100], [40, 85]]
+        colors: [[270, 100], [180, 60]]
         interval: 20
   key: '{{ states(''input_text.outdoor_theme_key'') }}'
   theme: '{%- if key == ''paint_theme'' -%}{%- set sp = states(''input_number.outdoor_paint_speed'') |
@@ -354,6 +355,19 @@ sequence:
         - condition: template
           value_template: '{{ full or is_state(''script.outdoor_bulb_chase'', ''off'') }}'
         then:
+        - repeat:
+            for_each: '{{ classes.c }}'
+            sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ repeat.item }}'
+              data:
+                hs_color: '{{ theme.bulbs.colors[(classes.ca.index(repeat.item) if repeat.item in classes.ca
+                  else 0) % (theme.bulbs.colors | length)] }}'
+                brightness: 255
+                transition: 0
+              continue_on_error: true
+          alias: Power the colour bulbs on first (the chase only runs while the group is on)
         - action: script.turn_on
           target:
             entity_id: script.outdoor_bulb_chase
@@ -407,31 +421,36 @@ sequence:
       sequence:
       - variables:
           bulb: '{{ repeat.item }}'
-          needs_ct: '{{ state_attr(repeat.item, ''color_mode'') not in [none, ''color_temp''] }}'
-      - if:
-        - condition: template
-          value_template: '{{ bulb in integration_entities(''lifx'') }}'
-        then:
-        - action: lifx.set_state
-          target:
-            entity_id: '{{ bulb }}'
-          data:
-            power: true
-          continue_on_error: true
-        else:
-        - action: light.turn_on
-          target:
-            entity_id: '{{ bulb }}'
-          continue_on_error: true
-      - if:
-        - condition: template
-          value_template: '{{ needs_ct }}'
-        then:
-        - action: light.turn_on
-          target:
-            entity_id: '{{ bulb }}'
-          data:
-            color_temp_kelvin: '{{ [[white_kelvin, state_attr(bulb, ''min_color_temp_kelvin'') | int(2700)]
-              | max, state_attr(bulb, ''max_color_temp_kelvin'') | int(6500)] | min }}'
-            brightness: '{{ white_brightness }}'
-          continue_on_error: true
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ ''color_temp'' in (state_attr(bulb, ''supported_color_modes'') | default([],
+              true)) }}'
+          sequence:
+          - action: light.turn_on
+            target:
+              entity_id: '{{ bulb }}'
+            data:
+              color_temp_kelvin: '{{ [[white_kelvin, state_attr(bulb, ''min_color_temp_kelvin'') | int(2700)]
+                | max, state_attr(bulb, ''max_color_temp_kelvin'') | int(6500)] | min }}'
+              brightness: '{{ white_brightness }}'
+            continue_on_error: true
+        default:
+        - if:
+          - condition: template
+            value_template: '{{ bulb in integration_entities(''lifx'') }}'
+          then:
+          - action: lifx.set_state
+            target:
+              entity_id: '{{ bulb }}'
+            data:
+              power: true
+            continue_on_error: true
+          else:
+          - action: light.turn_on
+            target:
+              entity_id: '{{ bulb }}'
+            continue_on_error: true
+    note: 'Capability based, not state based: a light that is off reports no colour mode, so the code
+      asks which modes the light supports. A light with colour temperature gets one light.turn_on with
+      white_kelvin (clamped to its range) and white_brightness. Any other light is just powered on.'

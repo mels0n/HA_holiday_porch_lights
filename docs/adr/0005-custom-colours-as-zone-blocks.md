@@ -13,6 +13,8 @@ Scenes could not describe either. They hold a fixed state per light, not an effe
 
 ## Decision
 
+The rules table from ADR-0001 still decides which holiday applies, but it now lives in `scripts/outdoor_resolve_theme.yaml`, and the second element of each row is a theme key (for example `halloween`), not a scene name. The script only picks a key and a display name and touches no lights.
+
 Keep the looks in a `themes` table in the apply script, and give each strand entry one of two modes:
 
 - **move:** call `lifx.effect_move` with a built-in LIFX theme name and a speed.
