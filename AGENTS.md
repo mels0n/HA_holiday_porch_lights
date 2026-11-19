@@ -16,7 +16,7 @@ A how-to for holiday-themed outdoor lights in Home Assistant, built around LIFX.
 
 ## Checks
 
-- YAML must parse: `python -c "import yaml,sys; [yaml.safe_load(open(f)) for f in sys.argv[1:]]" automations/*.yaml scripts/*.yaml packages/*.yaml dashboards/*.yaml`
+- YAML must parse. This is a syntax check only, it does not prove the scripts work: `python -c "import yaml,glob; [yaml.safe_load(open(f,encoding='utf-8')) for f in glob.glob('*/*.yaml')]"`
 - Test changes to the resolve template in Developer tools > Template against a real instance, with a hand-built events list for dates such as 31 October, 20 December and 4 July, before committing.
 - Test changes to the apply script by running it against a real strand and bulbs, for a built-in theme, a custom colour theme and white.
 
@@ -25,6 +25,6 @@ A how-to for holiday-themed outdoor lights in Home Assistant, built around LIFX.
 - Keep examples generic: no real entity names, area ids, calendar URLs or IP addresses from a specific house.
 - Use `color_temp_kelvin`, never `color_temp` (mireds), in light actions.
 - Every holiday is a row in the `rules` table plus an entry in the `themes` table. Do not add per-holiday branches.
-- Lights are named only in the `light.outdoor_lights` group. Scripts sort members by capability at run time.
+- Lights are named only in the `light.outdoor_lights` group. Scripts sort members by capability at run time. The per-light tiles in the dashboard view are optional extras and may be edited by hand.
 - Prefer native triggers and conditions over templates where one exists.
 - Explain non-obvious steps with a comment or `note:` next to the step.

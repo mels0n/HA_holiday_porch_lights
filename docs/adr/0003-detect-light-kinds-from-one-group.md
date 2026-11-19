@@ -24,4 +24,4 @@ Unavailable members are skipped. Adding a light means adding it to the group.
 
 ## Consequences
 
-The group is the contract: a light that is not in it is never touched by the nightly run. A light that is mid-reconnect has no capabilities to read, so it is skipped until it is available, and the reconnect automation applies the theme to it when it returns. Because the sorting runs on every apply, the cost is a small template evaluated each time.
+The group is the contract: a light that is not in it is never touched by the nightly run. A light that is mid-reconnect has no capabilities to read, so it is skipped until it is available, and the reconnect automation handles it when it returns: in the evening it applies the theme to that one light, and outside the evening, with no manual pick, it turns the light off, because many lights power on by themselves after an outage. Because the sorting runs on every apply, the cost is a small template evaluated each time.

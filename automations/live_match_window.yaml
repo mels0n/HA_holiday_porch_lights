@@ -3,8 +3,10 @@ alias: Live match window
 description: 'Optional. Everything for a live match, using the Team Tracker sensor (sensor.team_tracker).
   Turns input_boolean.match_window on from 2 hours before kickoff until 15 minutes after full time and
   runs script.outdoor_lights_fix at each edge, so the live match theme takes top calendar priority only
-  for that window. Safety: off after 5 hours on, or when the sensor reports no game. When your team''s
-  score goes up during the match and light.outdoor_lights is on, runs script.goal_celebration.'
+  for that window. Safety: off after 5 hours on, or when the sensor reports no game, and every 15 minutes
+  (and at startup) the window is reconciled against the sensor and the kickoff time, so a restart cannot
+  leave it stuck. When your team''s score goes up during the match and light.outdoor_lights is on (or a
+  goal show is already running), runs script.goal_celebration.'
 triggers:
 - trigger: template
   value_template: '{{ is_state(''sensor.team_tracker'', ''PRE'') and state_attr(''sensor.team_tracker'',
@@ -38,6 +40,9 @@ triggers:
 - trigger: homeassistant
   event: start
   id: reconcile
+- trigger: time_pattern
+  minutes: /15
+  id: reconcile_periodic
 - trigger: state
   entity_id: sensor.team_tracker
   attribute: team_score
@@ -69,15 +74,31 @@ actions:
     - action: script.outdoor_lights_fix
   - conditions:
     - condition: trigger
-      id: reconcile
+      id:
+      - reconcile
+      - reconcile_periodic
     sequence:
-    - delay:
-        seconds: 60
+    - if:
+      - condition: trigger
+        id: reconcile
+      then:
+      - delay:
+          seconds: 60
+        note: After a restart, give the sensor time to report. The 15 minute pass skips this.
+    - condition: not
+      conditions:
+      - condition: state
+        entity_id: sensor.team_tracker
+        state:
+        - unavailable
+        - unknown
+      note: Do not act on a sensor that is not reporting.
     - variables:
         want: '{{ is_state(''sensor.team_tracker'', ''IN'') or (is_state(''sensor.team_tracker'', ''PRE'')
           and state_attr(''sensor.team_tracker'', ''date'') is not none and now() >= as_datetime(state_attr(''sensor.team_tracker'',
           ''date'')) - timedelta(hours=2)) or (is_state(''sensor.team_tracker'', ''POST'') and is_state(''input_boolean.match_window'',
-          ''on'') and now() - states.sensor.team_tracker.last_changed < timedelta(minutes=15)) }}'
+          ''on'') and state_attr(''sensor.team_tracker'', ''date'') is not none and timedelta(0) <= now() - as_datetime(state_attr(''sensor.team_tracker'', ''date'')) < timedelta(hours=3))
+          }}'
     - if:
       - condition: template
         value_template: '{{ want != is_state(''input_boolean.match_window'', ''on'') }}'
@@ -104,9 +125,14 @@ actions:
     - condition: template
       value_template: '{{ trigger.to_state.attributes.team_score | int(0) > trigger.from_state.attributes.team_score
         | int(0) }}'
-    - condition: state
-      entity_id: light.outdoor_lights
-      state: 'on'
+    - condition: or
+      conditions:
+      - condition: state
+        entity_id: light.outdoor_lights
+        state: 'on'
+      - condition: state
+        entity_id: script.goal_celebration
+        state: 'on'
     sequence:
     - action: script.turn_on
       target:

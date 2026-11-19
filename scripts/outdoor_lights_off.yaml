@@ -1,0 +1,34 @@
+# Script. Settings > Automations & scenes > Scripts > Add script > three-dot menu > Edit in YAML.
+# Save it as script.outdoor_lights_off (the entity id comes from the name).
+alias: Outdoor Lights Off
+icon: mdi:lightbulb-off
+mode: queued
+max: 3
+description: 'Turns the outdoor lights off cleanly: stops the bulb chase and the goal show, stops every
+  strand effect, then turns light.outdoor_lights off. Used by the Fix script outside the evening window,
+  by the nightly automation at 23:59 and by the dashboard All off button. A plain light.turn_off would
+  leave the chase running to switch the bulbs back on.'
+sequence:
+- action: script.turn_off
+  target:
+    entity_id:
+    - script.outdoor_bulb_chase
+    - script.goal_celebration
+  continue_on_error: true
+  note: If goal_celebration is not installed this errors harmlessly (continue_on_error).
+- variables:
+    strands: '{% set ns = namespace(l=[]) %}{% for e in (state_attr(''light.outdoor_lights'',''entity_id'')
+      or []) %}{% set s = states[e] %}{% if s is not none and s.state not in [''unavailable'',''unknown'']
+      and ''effect_move'' in (s.attributes.effect_list | default([], true)) %}{% set ns.l = ns.l + [e]
+      %}{% endif %}{% endfor %}{{ ns.l }}'
+- if:
+  - condition: template
+    value_template: '{{ strands | length > 0 }}'
+  then:
+  - action: lifx.effect_stop
+    target:
+      entity_id: '{{ strands }}'
+    continue_on_error: true
+- action: light.turn_off
+  target:
+    entity_id: light.outdoor_lights

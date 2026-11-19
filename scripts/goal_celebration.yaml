@@ -5,8 +5,10 @@ icon: mdi:firework
 mode: restart
 description: '10 s of fireworks on the colour outdoor lights (strand: LIFX fireworks_finale at fastest
   move; colour bulbs: fast colour loop), then flashes the team colours 1 s on / 1 s off once per goal
-  (sensor.team_tracker team_score; field goals overrides), then re-applies the active outdoor theme. Waits
-  input_number.goal_delay seconds first. The red and blue values are an example: swap in your team''s
+  (sensor.team_tracker team_score; field goals overrides), then runs script.outdoor_lights_fix, which
+  re-applies the active theme (or turns the lights off if the evening has ended). Waits input_number.goal_delay
+  seconds first. The fireworks and colour loop are LIFX effects: other brands of colour bulb skip the
+  colour loop and just show the team colours. The red and blue values are an example: swap in your team''s
   hues.'
 fields:
   goals:
@@ -21,6 +23,12 @@ sequence:
 - delay:
     seconds: '{{ states(''input_number.goal_delay'') | int(0) }}'
 - variables:
+    # Team colours as [hue, saturation]. The `team` theme in outdoor_apply_theme.yaml uses the same
+    # two colours: change both places together.
+    team_a: [340, 100]
+    team_b: [220, 100]
+    # Zones painted on a strand. Zones a strand does not have are ignored, so raise it for a longer one.
+    zone_count: 120
     targets: '{{ expand(''light.outdoor_lights'') | selectattr(''state'', ''ne'', ''unavailable'') | selectattr(''attributes.supported_color_modes'',
       ''defined'') | selectattr(''attributes.supported_color_modes'', ''contains'', ''hs'') | map(attribute=''entity_id'')
       | list }}'
@@ -31,17 +39,20 @@ sequence:
       | max, 10] | min }}'
 - variables:
     bulbs: '{{ targets | reject(''in'', strands) | list }}'
+    lifx_targets: '{{ targets | select(''in'', integration_entities(''lifx'')) | list }}'
+    lifx_bulbs: '{{ bulbs | select(''in'', integration_entities(''lifx'')) | list }}'
+    other_bulbs: '{{ bulbs | reject(''in'', integration_entities(''lifx'')) | list }}'
 - action: script.turn_off
   target:
     entity_id: script.outdoor_bulb_chase
   continue_on_error: true
 - if:
   - condition: template
-    value_template: '{{ targets | length > 0 }}'
+    value_template: '{{ lifx_targets | length > 0 }}'
   then:
   - action: lifx.effect_stop
     target:
-      entity_id: '{{ targets }}'
+      entity_id: '{{ lifx_targets }}'
     continue_on_error: true
 - if:
   - condition: template
@@ -64,11 +75,11 @@ sequence:
     continue_on_error: true
 - if:
   - condition: template
-    value_template: '{{ bulbs | length > 0 }}'
+    value_template: '{{ lifx_bulbs | length > 0 }}'
   then:
   - action: lifx.effect_colorloop
     target:
-      entity_id: '{{ bulbs }}'
+      entity_id: '{{ lifx_bulbs }}'
     data:
       brightness: 255
       period: 1
@@ -79,15 +90,28 @@ sequence:
       transition: 0
       power_on: true
     continue_on_error: true
+- if:
+  - condition: template
+    value_template: '{{ other_bulbs | length > 0 }}'
+  then:
+  - action: light.turn_on
+    target:
+      entity_id: '{{ other_bulbs }}'
+    data:
+      hs_color: '{{ team_a }}'
+      brightness: 255
+      transition: 0
+    continue_on_error: true
+  alias: Bulbs that are not LIFX have no colour loop, so they show a team colour for the 10 s
 - delay:
     seconds: 10
 - if:
   - condition: template
-    value_template: '{{ targets | length > 0 }}'
+    value_template: '{{ lifx_targets | length > 0 }}'
   then:
   - action: lifx.effect_stop
     target:
-      entity_id: '{{ targets }}'
+      entity_id: '{{ lifx_targets }}'
     continue_on_error: true
   - delay:
       milliseconds: 500
@@ -98,9 +122,9 @@ sequence:
         target:
           entity_id: '{{ repeat.item }}'
         data:
-          zones: '{%- set ns = namespace(z=[]) -%}{%- for z in range(120) -%}{%- if (z // 4) % 2 == 0
+          zones: '{%- set ns = namespace(z=[]) -%}{%- for z in range(zone_count) -%}{%- if (z // 4) % 2 == 0
             -%}{%- set ns.z = ns.z + [z] -%}{%- endif -%}{%- endfor -%}{{ ns.z }}'
-          hs_color: [340, 100]
+          hs_color: '{{ team_a }}'
           brightness: 255
           transition: 0
         continue_on_error: true
@@ -108,9 +132,9 @@ sequence:
         target:
           entity_id: '{{ repeat.item }}'
         data:
-          zones: '{%- set ns = namespace(z=[]) -%}{%- for z in range(120) -%}{%- if (z // 4) % 2 == 1
+          zones: '{%- set ns = namespace(z=[]) -%}{%- for z in range(zone_count) -%}{%- if (z // 4) % 2 == 1
             -%}{%- set ns.z = ns.z + [z] -%}{%- endif -%}{%- endfor -%}{{ ns.z }}'
-          hs_color: [220, 100]
+          hs_color: '{{ team_b }}'
           brightness: 255
           transition: 0
         continue_on_error: true
@@ -122,7 +146,7 @@ sequence:
         target:
           entity_id: '{{ repeat.item }}'
         data:
-          hs_color: '{{ [220, 100] if repeat.index % 2 == 1 else [340, 100] }}'
+          hs_color: '{{ team_b if repeat.index % 2 == 1 else team_a }}'
           brightness: 255
           transition: 0
         continue_on_error: true
@@ -146,4 +170,5 @@ sequence:
         continue_on_error: true
       - delay:
           seconds: 1
-- action: script.outdoor_apply_theme
+- action: script.outdoor_lights_fix
+  note: Fix, not apply, so a show that ends after 23:59 turns the lights off instead of re-lighting them.

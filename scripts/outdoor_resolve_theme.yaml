@@ -2,7 +2,8 @@
 # Save it as script.outdoor_resolve_theme (the entity id comes from the name).
 alias: Outdoor Resolve Theme
 icon: mdi:calendar-star
-mode: single
+mode: queued
+max: 5
 description: 'Picks tonight''s outdoor lighting theme key from the holiday calendar, a team schedule calendar
   and an optional club team calendar, and writes it to input_text.outdoor_theme_key. The display name
   goes to input_text.porch_theme. First matching rule wins; a rule matches when its keyword is in an event
@@ -31,18 +32,25 @@ sequence:
   continue_on_error: true
   note: The team's schedule calendar. Only timed events whose title contains the team name (see is_game_day
     below) count as a game day.
-- action: calendar.get_events
-  target:
-    entity_id: '{{ states.calendar | selectattr(''name'', ''search'', ''(?i)club team'') | map(attribute=''entity_id'')
+- variables:
+    club_calendars: '{{ states.calendar | selectattr(''name'', ''search'', ''(?i)club team'') | map(attribute=''entity_id'')
       | list }}'
-  data:
-    start_date_time: '{{ today_at(''00:00'') }}'
-    end_date_time: '{{ today_at(''00:00'') + timedelta(days=1) }}'
-  response_variable: youth_events
-  continue_on_error: true
+    youth_events: {}
   note: 'Optional club or youth team calendar(s), found by name so a renamed or replacement subscription
-    is picked up without edits. Change the pattern to match your calendar''s name. continue_on_error:
-    no matching calendar leaves youth_events undefined.'
+    is picked up without edits. Change the pattern to match your calendar''s name.'
+- alias: Club team calendar lookup (skipped when no calendar matches)
+  if:
+  - condition: template
+    value_template: '{{ club_calendars | length > 0 }}'
+  then:
+  - action: calendar.get_events
+    target:
+      entity_id: '{{ club_calendars }}'
+    data:
+      start_date_time: '{{ today_at(''00:00'') }}'
+      end_date_time: '{{ today_at(''00:00'') + timedelta(days=1) }}'
+    response_variable: youth_events
+    continue_on_error: true
 - variables:
     is_game_day: |-
       {%- set day = now().date() | string -%}
@@ -55,13 +63,13 @@ sequence:
       {%- endfor -%}{%- endfor -%}{%- endfor -%}
       {{ ns.n > 0 }}
     chosen_rule: |-
-      {%- set events = holiday_events.get('calendar.holidays', {}).get('events', []) if holiday_events is defined else [] -%}
+      {%- set events = ((holiday_events.values() | list | first | default({})).get('events', [])) if holiday_events is defined else [] -%}
       {%- set rules = [
         ['Christmas Day','christmas',25,'Christmas'],
         ['Halloween','halloween',15,'Halloween'],
         ['Thanksgiving Day','thanksgiving',10,'Thanksgiving'],
         ["New Year's Day",'new_year',4,'New Year'],
-        ['Independence Day','independence',4,'Fourth of July'],
+        ['Independence Day','independence',4,'Fourth of July','Juneteenth'],
         ['Memorial Day','memorial',0,'Memorial Day'],
         ['Juneteenth','civic',0,'Juneteenth'],
         ['Labor Day','civic',0,'Labor Day'],
@@ -74,7 +82,7 @@ sequence:
       {%- set pick = namespace(key='none') -%}
       {%- for r in rules if pick.key == 'none' -%}
       {%- for e in events if pick.key == 'none' -%}
-      {%- if r[0] in e.summary -%}
+      {%- if r[0] in e.summary and (r | length < 5 or r[4] not in e.summary) -%}
       {%- set raw = e.start -%}
       {%- set ds = (raw if raw is string else (raw.date if raw.date is defined else (raw.dateTime if raw.dateTime is defined else ''))) | string -%}
       {%- if ds | length >= 10 -%}
@@ -94,31 +102,39 @@ sequence:
       {%- if s | length > 10 and (as_datetime(s) | as_local).date() | string == day and ' - game' in (e.summary | default('') | lower) -%}{%- set ns.n = ns.n + 1 -%}{%- endif -%}
       {%- endfor -%}{%- endfor -%}
       {{ ns.n > 0 }}
-  note: 'Rules rows: keyword, theme key, lead-window days, display name. calendar.get_events start/end
+  note: 'Rules rows: keyword, theme key, lead-window days, display name, and an optional fifth element:
+    a keyword that must NOT be in the summary (Juneteenth National Independence Day contains Independence
+    Day). calendar.get_events start/end
     are plain ISO strings (date-only for all-day events), so the date math uses strptime(...).date().
     is_game_day: a timed event starting today (local time) whose title contains the team name (lowercase
     ''my team'' here, change it), any case. All-day events are ignored. chosen_rule = key|display name|days
     until the holiday, or none. is_youth_game: a timed event starting today whose title contains '' -
     Game'' on a club team calendar (practices and training are skipped).'
 - variables:
-    theme_key: '{%- set ov = states(''input_select.outdoor_theme_override'') -%}{%- set m = {''Paint:
-      LIFX theme'': ''paint_theme'', ''Paint: my colours'': ''paint_custom'', ''Christmas'': ''christmas'',
-      ''Halloween'': ''halloween'', ''Thanksgiving'': ''thanksgiving'', ''New Year'': ''new_year'', ''Fourth
-      of July'': ''independence'', ''USA'': ''civic'', ''Memorial Day'': ''memorial'', ''MLK Day'': ''mlk'',
-      "Valentine''s Day": ''valentines'', "St. Patrick''s Day": ''st_patricks'', ''Game day'': ''team'',
-      ''Club team'': ''club_team'', ''White'': ''white''} -%}{%- if ov in m -%}{{ m[ov] }}{%- else -%}{%-
+    override_map:
+      'Paint: LIFX theme': paint_theme
+      'Paint: my colours': paint_custom
+      Christmas: christmas
+      Halloween: halloween
+      Thanksgiving: thanksgiving
+      New Year: new_year
+      Fourth of July: independence
+      USA: civic
+      Memorial Day: memorial
+      MLK Day: mlk
+      Valentine's Day: valentines
+      St. Patrick's Day: st_patricks
+      Game day: team
+      Club team: club_team
+      White: white
+    theme_key: '{%- set ov = states(''input_select.outdoor_theme_override'') -%}{%- if ov in override_map -%}{{ override_map[ov] }}{%- else -%}{%-
       set r = (chosen_rule | trim).split(''|'') -%}{%- set has = r[0] != ''none'' -%}{%- set day_of =
       has and (r[2] | int(99)) == 0 -%}{%- if is_state(''input_boolean.match_window'', ''on'') -%}team{%-
       elif day_of -%}{{ r[0] }}{%- elif is_youth_game -%}club_team{%- elif has -%}{{ r[0] }}{%- elif is_game_day
       -%}team{%- else -%}white{%- endif -%}{%- endif -%}'
-    theme_name: '{%- set ov = states(''input_select.outdoor_theme_override'') -%}{%- set m = {''Paint:
-      LIFX theme'': ''paint_theme'', ''Paint: my colours'': ''paint_custom'', ''Christmas'': ''christmas'',
-      ''Halloween'': ''halloween'', ''Thanksgiving'': ''thanksgiving'', ''New Year'': ''new_year'', ''Fourth
-      of July'': ''independence'', ''USA'': ''civic'', ''Memorial Day'': ''memorial'', ''MLK Day'': ''mlk'',
-      "Valentine''s Day": ''valentines'', "St. Patrick''s Day": ''st_patricks'', ''Game day'': ''team'',
-      ''Club team'': ''club_team'', ''White'': ''white''} -%}{%- if ov == ''Paint: LIFX theme'' -%}Painted:
+    theme_name: '{%- set ov = states(''input_select.outdoor_theme_override'') -%}{%- if ov == ''Paint: LIFX theme'' -%}Painted:
       {{ states(''input_select.outdoor_paint_theme'') | replace(''_'', '' '') | title }}{%- elif ov ==
-      ''Paint: my colours'' -%}Painted: my colours{%- elif ov in m -%}{{ ov }} (manual){%- else -%}{%-
+      ''Paint: my colours'' -%}Painted: my colours{%- elif ov in override_map -%}{{ ov }} (manual){%- else -%}{%-
       set r = (chosen_rule | trim).split(''|'') -%}{%- set has = r[0] != ''none'' -%}{%- set day_of =
       has and (r[2] | int(99)) == 0 -%}{%- if is_state(''input_boolean.match_window'', ''on'') -%}Match
       live{%- elif day_of -%}{{ r[1] }}{%- elif is_youth_game -%}Club team game day{%- elif has -%}{{

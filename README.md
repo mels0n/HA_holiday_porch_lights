@@ -14,7 +14,7 @@ This is a cleaned-up, generic version of the setup running on my own porch, not 
 
 - **One group is the list of lights.** `light.outdoor_lights` is the only place the lights are named. The scripts read its members at run time and sort them by capability: a LIFX multizone strand (its effect list has `effect_move`), colour bulbs (they support `hs`), and white-only lights. To add a light, add it to the group.
 - **Resolve, apply, fix.** `outdoor_resolve_theme` decides tonight's theme and touches no lights. `outdoor_apply_theme` drives the lights. `outdoor_lights_fix` does both and is always safe to press.
-- **One rules table.** `scripts/outdoor_resolve_theme.yaml` holds a table of `[summary substring, key, lead days, display name]` rows. It is the only place a holiday is defined.
+- **One rules table.** `scripts/outdoor_resolve_theme.yaml` holds a table of `[summary substring, key, lead days, display name]` rows, with an optional fifth element for a keyword the summary must not contain. It is the only place a holiday is defined.
 - **Looks live in one theme table.** `scripts/outdoor_apply_theme.yaml` maps each theme key to what the strand and the bulbs do.
 - **Survives a missing calendar.** Every calendar lookup continues on error. If one is briefly unavailable the script falls through to the next branch and the lights still come on.
 - **Theme name (optional).** The resolve script records the display name of the choice in `input_text.porch_theme`, so a dashboard or a public badge can show what the porch is doing tonight.
@@ -31,13 +31,16 @@ flowchart LR
   CHASE --> LIGHTS
   NIGHT["nightly_outdoor_lights"] -- "sunset-30" --> RESOLVE
   NIGHT -- "then" --> APPLY
-  NIGHT -- "23:59" --> LIGHTS
+  NIGHT -- "23:59" --> OFF["outdoor_lights_off"]
+  OFF --> LIGHTS
   NIGHT -- "override change, manual Run" --> FIX["outdoor_lights_fix"]
   DASH["Dashboard buttons"] --> FIX
   FIX --> RESOLVE
   FIX --> APPLY
-  FIX -- "outside the evening" --> LIGHTS
-  RECON["outdoor_light_reconnect"] -- "one light" --> APPLY
+  FIX -- "outside the evening" --> OFF
+  DASH -- "All off" --> OFF
+  RECON["outdoor_light_reconnect"] -- "one light, in the evening" --> APPLY
+  RECON -- "one light, otherwise" --> LIGHTS
 ```
 
 **Precedence.** The first line that matches wins.
@@ -68,9 +71,10 @@ A holiday lead-up (Christmas starts 25 days out, Halloween 15) keeps its look on
 | `scripts/outdoor_apply_theme.yaml` | The theme table, the two paint themes, and the code that drives strands, bulbs and white lights |
 | `scripts/outdoor_bulb_chase.yaml` | The loop that keeps colour bulbs changing |
 | `scripts/outdoor_lights_fix.yaml` | The Fix button: stop, re-pick, then apply or turn off |
+| `scripts/outdoor_lights_off.yaml` | Stops the chase, the goal show and strand effects, then turns the group off |
 | `scripts/goal_celebration.yaml` | Optional goal show for the live match |
 | `automations/nightly_outdoor_lights.yaml` | The schedule: sunset-30 on, 23:59 off, restart and dashboard handling |
-| `automations/outdoor_light_reconnect.yaml` | Re-applies the theme to a light that comes back |
+| `automations/outdoor_light_reconnect.yaml` | A light that comes back gets the theme in the evening, or is turned off outside it |
 | `automations/live_match_window.yaml` | Optional: opens a match window and triggers the goal show |
 | `dashboards/holiday_lights_view.yaml` | A sections view with the buttons, theme picks and paint controls |
 
@@ -92,7 +96,7 @@ Theme white uses fixed values, `white_kelvin: 2700` and `white_brightness: 255`,
 
 ## Install
 
-**Requirements:** Home Assistant 2024.10 or later, the core Holiday and LIFX integrations, and at least one LIFX light. The Sun integration is on by default. The dashboard view needs [Mushroom](https://github.com/piitaya/lovelace-mushroom) from HACS. The live match is optional and needs the [Team Tracker](https://github.com/vasqued2/ha-teamtracker) integration from HACS.
+**Requirements:** Home Assistant, tested on 2026.11 (it needs a recent release for the tile card features and the `note:` field on actions), the core Holiday and LIFX integrations, and at least one LIFX light. The Sun integration is on by default. The dashboard view needs [Mushroom](https://github.com/piitaya/lovelace-mushroom) from HACS. The live match is optional and needs the [Team Tracker](https://github.com/vasqued2/ha-teamtracker) integration from HACS.
 
 1. **Holiday calendar.** Settings > Devices & services > Add integration > Holiday, pick your country and region. Note the calendar entity it creates and use it in place of `calendar.holidays`. If a holiday you want (Halloween, Valentine's Day, St. Patrick's Day) is missing, check the integration's options for extra holiday categories.
 2. **Team calendar (optional).** Add your team's schedule as a calendar, for example with the Remote Calendar integration and the ICS link the league publishes. Use its entity in place of `calendar.team_schedule`. Keep the same entity id from year to year by editing the URL in place: deleting and re-adding the calendar can give it a new id. In `scripts/outdoor_resolve_theme.yaml`, change `'my team'` in `is_game_day` to a lowercase part of your team's name as it appears in event titles.
@@ -102,18 +106,21 @@ Theme white uses fixed values, `white_kelvin: 2700` and `white_brightness: 255`,
      packages: !include_dir_named packages
    ```
    Copy `packages/holiday_lights.yaml` to `/config/packages/`, swap the four lights in the group for your own, and restart. Or build the group in the UI (Settings > Devices & services > Helpers > Group > Light group, named `Outdoor lights`) and delete the `light:` block from the package.
-4. **Scripts.** For each file in `scripts/`: Settings > Automations & scenes > Scripts > Add script > three-dot menu > Edit in YAML, paste it, adjust the entities, save. Each script's entity id comes from its name, so keep the names. Start with `outdoor_bulb_chase`, `outdoor_apply_theme` and `outdoor_resolve_theme`, then `outdoor_lights_fix`. Skip `goal_celebration` unless you want the live match.
+4. **Scripts.** For each file in `scripts/`: Settings > Automations & scenes > Scripts > Add script > three-dot menu > Edit in YAML, paste it, adjust the entities, save. Each script's entity id comes from its name, so keep the names. Start with `outdoor_bulb_chase`, `outdoor_apply_theme`, `outdoor_resolve_theme` and `outdoor_lights_off`, then `outdoor_lights_fix`. Skip `goal_celebration` unless you want the live match.
 5. **Automations.** Settings > Automations & scenes > Create automation > three-dot menu > Edit in YAML. Paste `nightly_outdoor_lights.yaml`, then `outdoor_light_reconnect.yaml`, and `live_match_window.yaml` if you want it, and save each.
 6. **Dashboard.** Install Mushroom, then paste `dashboards/holiday_lights_view.yaml` into a dashboard as a view (the file explains how).
-7. **Try it.** Press Fix on the dashboard, or run the nightly automation by hand. Check Settings > Automations & scenes > Scripts > Outdoor Resolve Theme > Traces to see which branch it took.
+7. **Set the paint helpers.** The paint hues and speed have no starting value, so they keep your last setting across restarts. Set the three hue sliders and the speed once. The theme override is the exception: it goes back to Auto on every restart.
+8. **Try it.** Press Fix on the dashboard, or run the nightly automation by hand. Check Settings > Automations & scenes > Scripts > Outdoor Resolve Theme > Traces to see which branch it took.
 
 **Adding a theme.** Look up the exact event summary the calendar uses (Developer tools > Actions > `calendar.get_events`), then:
 
-1. Add a row to `rules` in the resolve script with a distinctive substring of it. Put rows with a long lead-up above rows with a short one.
+1. Add a row to `rules` in the resolve script with a distinctive substring of it. Put rows with a long lead-up above rows with a short one. If another holiday's name contains your substring, add that name as the optional fifth element so the row skips it.
 2. Add an entry under `themes` in the apply script. A strand entry is either `mode: move` with a built-in LIFX theme name, or `mode: blocks` with a list of `[hue, saturation]` colours. A bulb entry is `mode: chase` with its own colour list and an interval in seconds.
-3. If you want a manual button, add an option to `input_select.outdoor_theme_override` and to the option map in the resolve script.
+3. If you want a manual button, add an option to `input_select.outdoor_theme_override` and one line to `override_map` in the resolve script (it is defined once, and both the theme key and the display name read it). The dashboard buttons are a copy of the option block in the dashboard view.
 
-**Adding a light.** Add it to `light.outdoor_lights`. Nothing else changes.
+**Adding a light.** Add it to `light.outdoor_lights`. Nothing else changes. The per-light tiles on the dashboard are optional extras: add a tile for the new light there too if you want one.
+
+**Upgrading from the scene version.** The first version of this setup used scenes. Before adding the new files, delete the old pieces so they do not fight the new ones: `packages/porch_theme.yaml`, the "Nightly porch lights" automation, `script.porch_lights_with_holiday` and the `scene.porch_*` scenes. Then follow the install steps.
 
 ## Paint the house
 
@@ -130,15 +137,15 @@ Pick a LIFX theme from the paint select and press Paint, or set three hues and p
 `script.outdoor_lights_fix` is the one button for "something looks wrong". It stops the bulb loop, runs the resolve script again, then either applies the theme or turns everything off:
 
 - It applies the theme if it is between sunset-30 and 23:59, or if you pressed Turn on now, or if a manual pick is set.
-- Otherwise it stops any strand effect and turns the group off.
+- Otherwise it runs `script.outdoor_lights_off`, which stops the bulb loop, the goal show and any strand effect, then turns the group off. The dashboard's All off button runs the same script.
 
 Pressing Run on the nightly automation does the same thing, because a manual run has no trigger and falls to the automation's default branch. Use it after a power blip, a strand re-calibration, a stuck colour loop, or a calendar change.
 
 ## Live match (optional)
 
-`automations/live_match_window.yaml` uses the Team Tracker sensor to open `input_boolean.match_window` from two hours before kickoff to 15 minutes after full time. While it is on, the game-day look wins over everything except a manual pick. Fix runs at each edge. There is a five hour safety switch-off, and a restart reconciles the window.
+`automations/live_match_window.yaml` uses the Team Tracker sensor to open `input_boolean.match_window` from two hours before kickoff to 15 minutes after full time. While it is on, the game-day look wins over everything except a manual pick. Fix runs at each edge. There is a five hour safety switch-off. The window is also reconciled against the sensor and the kickoff time at every restart and every 15 minutes, so a restart cannot leave it stuck on or off. A finished match keeps the window open for at most three hours after kickoff.
 
-When your team scores and the lights are on, `script.goal_celebration` waits `input_number.goal_delay` seconds (broadcast lag), runs ten seconds of fireworks on the strand and a colour loop on the bulbs, flashes the team colours once per goal, and re-applies the theme. The colours in it are an example: edit the hues for your team.
+When your team scores and the lights are on, `script.goal_celebration` waits `input_number.goal_delay` seconds (broadcast lag), runs ten seconds of fireworks on the strand and a colour loop on the bulbs, flashes the team colours once per goal, and runs Fix, which re-applies the theme (or turns the lights off if the evening has ended in the meantime). The colours in it are an example: edit `team_a` and `team_b` at the top of the script, and the `team` theme in the apply script to match. The fireworks and the colour loop are LIFX effects, so colour bulbs from other brands skip them and just show a team colour. In the same way, a LIFX theme name only repaints LIFX bulbs: other colour bulbs rotate the theme's colour list instead.
 
 ## The gotchas
 
@@ -146,7 +153,7 @@ When your team scores and the lights are on, `script.goal_celebration` waits `in
 
 1. **Core calendar entities have no `events` attribute.** `state_attr('calendar.holidays', 'events')` returns nothing, so a find-and-replace of an old calendar entity id fails silently and every night falls through to the default. The events have to be fetched with the `calendar.get_events` action into a `response_variable`.
 2. **`duration:` counts from now.** With `duration:` the window starts at the current moment and returns an empty list whenever the next holiday is farther out than the window. The script uses an explicit `start_date_time` of today at 00:00 and an `end_date_time` 25 days later (the longest lead, for Christmas). Anchoring to the start of today also makes the day-of check reliable whatever time the script runs.
-3. **Holiday summaries are messy, so match by substring.** Martin Luther King Jr. Day arrives as one combined string (`Birthday of Martin Luther King, Jr.; Martin Luther King Jr. Day`, matched with `King`). Presidents Day is `Washington's Birthday`. Independence Day appears twice, including `Independence Day (observed)`. The calendar also carries many holidays with no theme (Christmas Eve, New Year's Eve, Good Friday, Groundhog Day, state holidays) that the substring list ignores by design. Never compare with `==`.
+3. **Holiday summaries are messy, so match by substring.** Martin Luther King Jr. Day arrives as one combined string (`Birthday of Martin Luther King, Jr.; Martin Luther King Jr. Day`, matched with `King`). Presidents Day is `Washington's Birthday`. Independence Day appears twice, including `Independence Day (observed)`, and Juneteenth arrives as `Juneteenth National Independence Day`, which contains the Independence Day keyword and would get its four-day lead-up. That is what the optional fifth element of a rules row is for: the Independence Day row excludes any summary containing `Juneteenth`. The calendar also carries many holidays with no theme (Christmas Eve, New Year's Eve, Good Friday, Groundhog Day, state holidays) that the substring list ignores by design. Never compare with `==`.
 
 One more shape to know: `calendar.get_events` returns `start` as a plain ISO string (`"2026-09-07"` for an all-day event), not a dict. The script reads the first ten characters and does date-only maths, which avoids the naive-versus-aware datetime error you get from comparing an all-day event with `now()`.
 
@@ -160,9 +167,13 @@ One more shape to know: `calendar.get_events` returns `start` as a plain ISO str
 
 **Tuning.** Lead days, colours and display names live in `rules` and `themes`. The start (30 minutes before sunset) and end (23:59) times live in the nightly automation. To end the evening at a different time, change the `time` trigger and the matching `before:` conditions in the nightly automation, the Fix script and the reconnect automation.
 
+**Recorder.** The bulb loop changes the colour bulbs every five seconds, which writes a lot of state history. Consider excluding the colour bulbs from the recorder.
+
 ## Publish live values (optional)
 
 The resolve script writes the theme name (for example `Halloween`, `Game day`, or `White`) to `input_text.porch_theme`, and it keeps that value until the next evening. That makes it publishable as a live badge, the same way the circadian-lights how-to publishes its sensors: see "Publish live values" in [HA_circadian_lights](https://github.com/mels0n/HA_circadian_lights) for the small read-only proxy. Add `input_text.porch_theme` to the proxy's `$entities` allow-list, then point a shields.io [dynamic JSON badge](https://shields.io/badges/dynamic-json-badge) at it with a query like `$['input_text.porch_theme']`.
+
+A word on privacy: the theme name tells anyone who reads it when a household is at or watching a game. Game day, club team and live match are the revealing ones. If you publish the value, you may prefer a neutral label, for example by mapping those names to a generic one in the proxy before it is returned.
 
 The proxy only ever reads the entity ids on its allow-list and only returns their `state`, so a caller cannot use it to read anything else.
 
