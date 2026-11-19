@@ -138,7 +138,11 @@ sequence:
           brightness: 255
           transition: 0
         continue_on_error: true
-    alias: 'Paint team colours: strand red/blue 4-zone blocks, bulbs blue/red'
+    alias: 'Paint team colours on LIFX strands: 4-zone blocks'
+- if:
+  - condition: template
+    value_template: '{{ targets | length > 0 }}'
+  then:
   - repeat:
       for_each: '{{ bulbs }}'
       sequence:
@@ -150,6 +154,7 @@ sequence:
           brightness: 255
           transition: 0
         continue_on_error: true
+    alias: 'Paint team colours on the colour bulbs (any brand)'
   - alias: 'Flash once per goal: 1 s off, 1 s on'
     repeat:
       count: '{{ flashes }}'
@@ -170,5 +175,9 @@ sequence:
         continue_on_error: true
       - delay:
           seconds: 1
-- action: script.outdoor_lights_fix
+- action: script.turn_on
+  target:
+    entity_id: script.outdoor_lights_fix
   note: Fix, not apply, so a show that ends after 23:59 turns the lights off instead of re-lighting them.
+    Started without waiting, because Fix's off path stops this script, which would otherwise cancel the
+    waiting Fix call before the lights turn off.

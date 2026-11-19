@@ -5,7 +5,7 @@ description: 'Optional. Everything for a live match, using the Team Tracker sens
   runs script.outdoor_lights_fix at each edge, so the live match theme takes top calendar priority only
   for that window. Safety: off after 5 hours on, or when the sensor reports no game, and every 15 minutes
   (and at startup) the window is reconciled against the sensor and the kickoff time, so a restart cannot
-  leave it stuck. When your team''s score goes up during the match and light.outdoor_lights is on (or a
+  leave it stuck (after a restart that missed full time, it can stay open up to 3 hours after kickoff). When your team''s score goes up during the match and light.outdoor_lights is on (or a
   goal show is already running), runs script.goal_celebration.'
 triggers:
 - trigger: template
