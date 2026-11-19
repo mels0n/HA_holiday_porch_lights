@@ -1,0 +1,115 @@
+# Automation. Settings > Automations & scenes > Create automation > three-dot menu > Edit in YAML.
+alias: Live match window
+description: 'Optional. Everything for a live match, using the Team Tracker sensor (sensor.team_tracker).
+  Turns input_boolean.match_window on from 2 hours before kickoff until 15 minutes after full time and
+  runs script.outdoor_lights_fix at each edge, so the live match theme takes top calendar priority only
+  for that window. Safety: off after 5 hours on, or when the sensor reports no game. When your team''s
+  score goes up during the match and light.outdoor_lights is on, runs script.goal_celebration.'
+triggers:
+- trigger: template
+  value_template: '{{ is_state(''sensor.team_tracker'', ''PRE'') and state_attr(''sensor.team_tracker'',
+    ''date'') is not none and now() >= as_datetime(state_attr(''sensor.team_tracker'', ''date'')) - timedelta(hours=2)
+    }}'
+  id: start
+- trigger: state
+  entity_id: sensor.team_tracker
+  to: IN
+  id: start
+- trigger: state
+  entity_id: sensor.team_tracker
+  to: POST
+  for:
+    minutes: 15
+  id: end
+- trigger: state
+  entity_id: sensor.team_tracker
+  to:
+  - BYE
+  - NOT_FOUND
+  for:
+    minutes: 30
+  id: end
+- trigger: state
+  entity_id: input_boolean.match_window
+  to: 'on'
+  for:
+    hours: 5
+  id: end
+- trigger: homeassistant
+  event: start
+  id: reconcile
+- trigger: state
+  entity_id: sensor.team_tracker
+  attribute: team_score
+  id: goal
+  note: Team score attribute changed; the goal branch checks it went up.
+actions:
+- choose:
+  - conditions:
+    - condition: trigger
+      id: start
+    - condition: state
+      entity_id: input_boolean.match_window
+      state: 'off'
+    sequence:
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.match_window
+    - action: script.outdoor_lights_fix
+  - conditions:
+    - condition: trigger
+      id: end
+    - condition: state
+      entity_id: input_boolean.match_window
+      state: 'on'
+    sequence:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.match_window
+    - action: script.outdoor_lights_fix
+  - conditions:
+    - condition: trigger
+      id: reconcile
+    sequence:
+    - delay:
+        seconds: 60
+    - variables:
+        want: '{{ is_state(''sensor.team_tracker'', ''IN'') or (is_state(''sensor.team_tracker'', ''PRE'')
+          and state_attr(''sensor.team_tracker'', ''date'') is not none and now() >= as_datetime(state_attr(''sensor.team_tracker'',
+          ''date'')) - timedelta(hours=2)) or (is_state(''sensor.team_tracker'', ''POST'') and is_state(''input_boolean.match_window'',
+          ''on'') and now() - states.sensor.team_tracker.last_changed < timedelta(minutes=15)) }}'
+    - if:
+      - condition: template
+        value_template: '{{ want != is_state(''input_boolean.match_window'', ''on'') }}'
+      then:
+      - if:
+        - condition: template
+          value_template: '{{ want }}'
+        then:
+        - action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.match_window
+        else:
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.match_window
+      - action: script.outdoor_lights_fix
+  - alias: Team goal while the lights are on - fireworks
+    conditions:
+    - condition: trigger
+      id: goal
+    - condition: state
+      entity_id: sensor.team_tracker
+      state: IN
+    - condition: template
+      value_template: '{{ trigger.to_state.attributes.team_score | int(0) > trigger.from_state.attributes.team_score
+        | int(0) }}'
+    - condition: state
+      entity_id: light.outdoor_lights
+      state: 'on'
+    sequence:
+    - action: script.turn_on
+      target:
+        entity_id: script.goal_celebration
+mode: queued
+max: 5
